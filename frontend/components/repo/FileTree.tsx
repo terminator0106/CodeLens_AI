@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Folder, FileCode, FileText, File } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, FileText, File, FileJson, FileType } from 'lucide-react';
 import { FileNode } from '../../types';
 
 interface FileTreeProps {
@@ -10,9 +10,9 @@ interface FileTreeProps {
 }
 
 export const FileTree: React.FC<FileTreeProps> = ({ node, onSelect, selectedId, depth = 0 }) => {
-  const [isOpen, setIsOpen] = useState(depth === 0); // Open root by default
+  const [isOpen, setIsOpen] = useState(depth === 0 || depth === 1); // Open root and first level by default
   const isSelected = selectedId === node.id;
-  
+
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (node.type === 'folder') {
@@ -23,38 +23,62 @@ export const FileTree: React.FC<FileTreeProps> = ({ node, onSelect, selectedId, 
   };
 
   const getIcon = () => {
-    if (node.type === 'folder') return <Folder size={16} className={isOpen ? "text-primary" : "text-gray-400"} />;
-    if (node.name.endsWith('.tsx') || node.name.endsWith('.ts')) return <FileCode size={16} className="text-blue-500" />;
+    if (node.type === 'folder') return isOpen ? <FolderOpen size={16} className="text-amber-500" /> : <Folder size={16} className="text-gray-400" />;
+    if (node.name.endsWith('.tsx') || node.name.endsWith('.jsx')) return <FileCode size={16} className="text-blue-500" />;
+    if (node.name.endsWith('.ts') || node.name.endsWith('.js')) return <FileCode size={16} className="text-yellow-600" />;
+    if (node.name.endsWith('.json')) return <FileJson size={16} className="text-green-600" />;
     if (node.name.endsWith('.md')) return <FileText size={16} className="text-gray-500" />;
+    if (node.name.endsWith('.css') || node.name.endsWith('.scss')) return <FileType size={16} className="text-pink-500" />;
     return <File size={16} className="text-gray-400" />;
   };
 
+  const fileCount = node.children?.filter(c => c.type === 'file').length || 0;
+  const folderCount = node.children?.filter(c => c.type === 'folder').length || 0;
+
   return (
     <div className="select-none">
-      <div 
-        className={`flex items-center py-1.5 px-2 cursor-pointer transition-colors rounded-md text-sm ${
-          isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-gray-600 hover:bg-gray-100'
-        }`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      <div
+        className={`flex items-center py-2 px-2 cursor-pointer transition-all rounded-lg text-sm group ${isSelected
+            ? 'bg-primary/10 text-primary font-semibold shadow-sm'
+            : node.type === 'folder'
+              ? 'text-gray-700 hover:bg-gray-100/80 font-medium'
+              : 'text-gray-600 hover:bg-gray-50'
+          } ${depth === 0 ? 'mb-1' : ''}`}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleToggle}
       >
-        <span className="mr-1.5 flex-shrink-0 text-gray-400">
-           {node.type === 'folder' && (
-             isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-           )}
-           {node.type === 'file' && <div className="w-3.5" />}
+        <span className="mr-2 flex-shrink-0 text-gray-400 group-hover:text-gray-600 transition-colors">
+          {node.type === 'folder' && (
+            isOpen ? <ChevronDown size={14} className="text-primary" /> : <ChevronRight size={14} />
+          )}
+          {node.type === 'file' && <div className="w-3.5" />}
         </span>
-        <span className="mr-2">{getIcon()}</span>
-        <span className="truncate">{node.name}</span>
+        <span className="mr-2 group-hover:scale-110 transition-transform">{getIcon()}</span>
+        <span className="truncate flex-1">{node.name}</span>
+        {node.type === 'folder' && !isOpen && (fileCount + folderCount > 0) && (
+          <span className="text-xs text-gray-400 ml-2 bg-gray-100 px-1.5 py-0.5 rounded">
+            {fileCount + folderCount}
+          </span>
+        )}
       </div>
-      
+
       {isOpen && node.children && (
-        <div>
-          {node.children.map(child => (
-            <FileTree 
-              key={child.id} 
-              node={child} 
-              onSelect={onSelect} 
+        <div className={`${depth === 0 ? 'border-l-2 border-gray-100 ml-3' : ''}`}>
+          {/* Folders first, then files */}
+          {node.children.filter(c => c.type === 'folder').map(child => (
+            <FileTree
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
+              selectedId={selectedId}
+              depth={depth + 1}
+            />
+          ))}
+          {node.children.filter(c => c.type === 'file').map(child => (
+            <FileTree
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
               selectedId={selectedId}
               depth={depth + 1}
             />

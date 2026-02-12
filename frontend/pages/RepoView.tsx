@@ -4,7 +4,7 @@ import { FileTree } from '../components/repo/FileTree';
 import { CodeViewer } from '../components/repo/CodeViewer';
 import { useRepoStore } from '../store';
 import { api } from '../services/api';
-import { ChevronRight, ArrowLeft, MessageSquare, Box, Layers, BookOpen, Settings, Search, GitBranch } from 'lucide-react';
+import { ChevronRight, ArrowLeft, MessageSquare, Box, Layers, BookOpen, Settings, Search, GitBranch, CheckCircle2, Zap, TrendingUp, Network, FileCode } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { FileNode } from '../types';
 
@@ -236,35 +236,67 @@ export const RepoView: React.FC = () => {
                     )}
 
                     {activeTab === 'explain' && (
-                        <div className="p-10 max-w-3xl mx-auto h-full overflow-y-auto">
+                        <div className="p-10 max-w-5xl mx-auto h-full overflow-y-auto">
                             {tabsEnabled ? (
-                                <div className="prose prose-lg prose-indigo max-w-none">
-                                    <h1 className="font-display tracking-tight text-3xl mb-6 flex items-center">
-                                        <span className="bg-primary/10 p-2 rounded-lg mr-3 text-primary"><BookOpen size={24} /></span>
-                                        {selectedFile.name}
-                                    </h1>
-                                    <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-indigo-900 mb-6 shadow-sm relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 p-4 opacity-10"><MessageSquare size={100} /></div>
-                                        <div className="flex items-center justify-between gap-4 relative z-10">
-                                            <h4 className="font-bold flex items-center gap-2 text-lg">Explanation</h4>
-                                            {!!explanation && !explainMessage && !explainError && !explainLoading && (
-                                                <span className="text-xs font-semibold uppercase tracking-wide bg-white/70 border border-indigo-100 text-indigo-900 px-2 py-1 rounded-full">
-                                                    Generated from indexed code
-                                                </span>
+                                <div className="max-w-none">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h1 className="font-display tracking-tight text-3xl flex items-center">
+                                            <span className="bg-primary/10 p-3 rounded-xl mr-4 text-primary"><BookOpen size={28} /></span>
+                                            <div>
+                                                <div className="text-2xl font-bold text-gray-900">{selectedFile.name}</div>
+                                                <div className="text-sm text-gray-500 font-normal mt-1">{selectedFile.filePath}</div>
+                                            </div>
+                                        </h1>
+                                        {!!explanation && !explainMessage && !explainError && !explainLoading && (
+                                            <span className="text-xs font-semibold uppercase tracking-wide bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-full flex items-center">
+                                                <CheckCircle2 size={14} className="mr-1.5" />
+                                                AI Generated
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="bg-gradient-to-br from-indigo-50 via-purple-50/30 to-pink-50/20 p-8 rounded-2xl border border-indigo-100 shadow-lg relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-6 opacity-5"><MessageSquare size={150} /></div>
+                                        <div className="relative z-10">
+                                            <h4 className="font-bold flex items-center gap-2 text-xl text-indigo-900 mb-4">
+                                                <Zap size={20} className="text-amber-500" />
+                                                AI Explanation
+                                            </h4>
+                                            {explainLoading && (
+                                                <div className="flex items-center space-x-3 text-indigo-800">
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                                                    <p className="text-base">Analyzing code and generating explanation…</p>
+                                                </div>
+                                            )}
+                                            {explainError && (
+                                                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                                                    <p className="text-base text-red-700">{explainError}</p>
+                                                </div>
+                                            )}
+                                            {!explainLoading && !explainError && explainMessage && (
+                                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                                    <p className="text-base text-amber-900">{explainMessage}</p>
+                                                </div>
+                                            )}
+                                            {!explainLoading && !explainError && !explainMessage && explanation && (
+                                                <div className="prose prose-lg prose-indigo max-w-none">
+                                                    <div className="text-base leading-relaxed text-gray-800 space-y-4">
+                                                        {explanation.split('\n').map((para, i) => {
+                                                            // Parse basic markdown: **bold**, *italic*, `code`
+                                                            const formatted = para
+                                                                .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+                                                                .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
+                                                                .replace(/`(.+?)`/g, '<code class="bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded text-sm font-mono">$1</code>');
+                                                            return para.trim() ? (
+                                                                <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
+                                                            ) : null;
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {!explainLoading && !explainError && !explainMessage && !explanation && (
+                                                <p className="text-base text-gray-600">No explanation available.</p>
                                             )}
                                         </div>
-                                        {explainLoading && (
-                                            <p className="text-base leading-relaxed text-indigo-800/80 relative z-10 mt-3">Generating explanation…</p>
-                                        )}
-                                        {explainError && (
-                                            <p className="text-base leading-relaxed text-red-700 relative z-10 mt-3">{explainError}</p>
-                                        )}
-                                        {!explainLoading && !explainError && explainMessage && (
-                                            <p className="text-base leading-relaxed text-indigo-800/80 relative z-10 mt-3">{explainMessage}</p>
-                                        )}
-                                        {!explainLoading && !explainError && !explainMessage && (
-                                            <p className="text-base leading-relaxed text-indigo-800/80 relative z-10 mt-3 whitespace-pre-wrap">{explanation || 'No explanation returned.'}</p>
-                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -280,43 +312,121 @@ export const RepoView: React.FC = () => {
                     )}
 
                     {activeTab === 'deps' && (
-                        <div className="p-10 max-w-3xl mx-auto h-full overflow-y-auto">
+                        <div className="p-10 max-w-6xl mx-auto h-full overflow-y-auto">
                             {tabsEnabled ? (
                                 <div>
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                                            <span className="bg-primary/10 p-2 rounded-lg mr-3 text-primary"><Layers size={20} /></span>
-                                            File Metrics
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                                            <span className="bg-primary/10 p-3 rounded-xl mr-3 text-primary"><Network size={24} /></span>
+                                            File Analysis
                                         </h2>
-                                        <span className="text-xs font-semibold uppercase tracking-wide bg-gray-50 border border-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                                        <span className="text-xs font-semibold uppercase tracking-wide bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-full">
                                             Deterministic
                                         </span>
                                     </div>
 
-                                    {metricsLoading && <div className="text-sm text-gray-500">Loading metrics…</div>}
-                                    {metricsError && <div className="text-sm text-red-600">{metricsError}</div>}
+                                    {metricsLoading && (
+                                        <div className="flex items-center space-x-3 text-gray-500">
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                                            <div className="text-sm">Loading analysis…</div>
+                                        </div>
+                                    )}
+                                    {metricsError && (
+                                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">{metricsError}</div>
+                                    )}
                                     {!metricsLoading && !metricsError && metrics && (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            {[
-                                                { label: 'Lines', value: metrics.lines },
-                                                { label: 'Chunks', value: metrics.chunks },
-                                                { label: 'Avg Chunk Size (tokens)', value: metrics.avg_chunk_size },
-                                            ].map((m) => (
-                                                <div key={m.label} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                                                    <div className="text-sm text-gray-500 font-semibold uppercase tracking-wider">{m.label}</div>
-                                                    <div className="text-3xl font-bold text-gray-900 mt-2 font-display">{m.value}</div>
+                                        <div className="space-y-8">
+                                            {/* Key Metrics */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                {[
+                                                    { label: 'Total Lines', value: metrics.lines, icon: <FileCode size={20} />, color: 'blue' },
+                                                    { label: 'Code Chunks', value: metrics.chunks, icon: <Box size={20} />, color: 'purple' },
+                                                    { label: 'Avg Chunk Size', value: `${metrics.avg_chunk_size} tokens`, icon: <Layers size={20} />, color: 'amber' },
+                                                ].map((m) => (
+                                                    <div key={m.label} className={`bg-gradient-to-br from-${m.color}-50 to-white p-6 rounded-xl border border-${m.color}-100 shadow-sm hover:shadow-md transition-shadow`}>
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <div className={`text-sm text-${m.color}-600 font-semibold uppercase tracking-wider`}>{m.label}</div>
+                                                            <div className={`text-${m.color}-500`}>{m.icon}</div>
+                                                        </div>
+                                                        <div className="text-3xl font-bold text-gray-900 font-display">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* File Structure Visualization */}
+                                            <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+                                                <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                                                    <TrendingUp size={20} className="mr-2 text-primary" />
+                                                    Code Complexity Flow
+                                                </h3>
+                                                <div className="space-y-4">
+                                                    {/* Complexity bar */}
+                                                    <div>
+                                                        <div className="flex justify-between text-sm text-gray-600 mb-2">
+                                                            <span className="font-medium">Lines of Code Distribution</span>
+                                                            <span className="text-gray-500">{metrics.lines} total lines</span>
+                                                        </div>
+                                                        <div className="h-12 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-xl relative overflow-hidden border border-gray-200">
+                                                            <div className="absolute inset-0 flex items-center px-4">
+                                                                <div className="h-8 bg-gradient-to-r from-green-500 to-amber-500 rounded-lg shadow-lg"
+                                                                    style={{ width: `${Math.min(100, (metrics.chunks / (metrics.lines / 100)) * 10)}%` }}>
+                                                                </div>
+                                                            </div>
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <span className="text-xs font-bold text-gray-700 drop-shadow">
+                                                                    {metrics.chunks} chunks extracted
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Token distribution */}
+                                                    <div className="grid grid-cols-2 gap-4 mt-6">
+                                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                                            <div className="text-sm text-blue-600 font-medium mb-1">Indexing Coverage</div>
+                                                            <div className="text-2xl font-bold text-blue-900">{Math.round((metrics.chunks * metrics.avg_chunk_size) / Math.max(1, metrics.lines))}%</div>
+                                                            <div className="text-xs text-blue-600 mt-1">tokens per line ratio</div>
+                                                        </div>
+                                                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                                                            <div className="text-sm text-purple-600 font-medium mb-1">Chunk Density</div>
+                                                            <div className="text-2xl font-bold text-purple-900">{(metrics.chunks / Math.max(1, metrics.lines / 100)).toFixed(2)}</div>
+                                                            <div className="text-xs text-purple-600 mt-1">chunks per 100 lines</div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            ))}
+                                            </div>
+
+                                            {/* Insights */}
+                                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-100">
+                                                <h4 className="font-bold text-indigo-900 mb-3 flex items-center">
+                                                    <Zap size={18} className="mr-2 text-amber-500" />
+                                                    Analysis Insights
+                                                </h4>
+                                                <ul className="space-y-2 text-sm text-indigo-800">
+                                                    <li className="flex items-start">
+                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-green-600 flex-shrink-0" />
+                                                        <span>This file contains <strong>{metrics.chunks}</strong> semantically meaningful code chunks for RAG retrieval.</span>
+                                                    </li>
+                                                    <li className="flex items-start">
+                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-green-600 flex-shrink-0" />
+                                                        <span>Average chunk size of <strong>{metrics.avg_chunk_size} tokens</strong> ensures optimal context window usage.</span>
+                                                    </li>
+                                                    <li className="flex items-start">
+                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-green-600 flex-shrink-0" />
+                                                        <span>Total <strong>{metrics.lines} lines</strong> analyzed and indexed for semantic search.</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
                                     <div className="bg-gray-50 p-6 rounded-full mb-6">
-                                        <Layers size={48} className="text-gray-300" />
+                                        <Network size={48} className="text-gray-300" />
                                     </div>
                                     <p className="text-xl font-bold text-gray-900">No file selected</p>
-                                    <p className="text-gray-500 mt-2">Select a file to view deterministic metrics.</p>
+                                    <p className="text-gray-500 mt-2">Select a file to view code analysis and metrics.</p>
                                 </div>
                             )}
                         </div>

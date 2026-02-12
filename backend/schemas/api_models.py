@@ -14,11 +14,13 @@ class UserResponse(BaseModel):
 class SignupRequest(BaseModel):
     email: str
     password: str = Field(min_length=8)
+    remember_me: bool = False
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+    remember_me: bool = False
 
 
 class AuthResponse(BaseModel):

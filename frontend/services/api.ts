@@ -3,6 +3,12 @@ import { useAuthStore } from '../store';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+const isAuthRoute = (path: string) => path.startsWith('/auth/');
+const isOnAuthScreen = () => {
+    const hash = window.location.hash || '';
+    return hash.startsWith('#/login') || hash.startsWith('#/signup');
+};
+
 const request = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
     const response = await fetch(`${API_BASE}${path}`, {
         credentials: 'include',
@@ -15,8 +21,14 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
 
     if (!response.ok) {
         if (response.status === 401) {
-            useAuthStore.getState().logout();
-            window.location.hash = '#/login';
+            // 401 on auth endpoints is expected (e.g., invalid credentials, not logged in yet).
+            // Only force-logout+redirect for protected, non-auth API calls.
+            if (!isAuthRoute(path)) {
+                useAuthStore.getState().logout();
+                if (!isOnAuthScreen()) {
+                    window.location.hash = '#/login';
+                }
+            }
         }
         const errorBody = await response.json().catch(() => ({}));
         const message = errorBody.error || errorBody.detail || 'Request failed';
@@ -29,9 +41,24 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
 const buildTree = (files: { id: number; file_path: string; language?: string }[]): FileNode[] => {
     const root: FileNode = { id: 'root', name: 'root', type: 'folder', children: [] };
 
+    const sortNodes = (nodes: FileNode[]) => {
+        nodes.sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+        nodes.forEach((n) => {
+            if (n.type === 'folder' && n.children && n.children.length > 0) {
+                sortNodes(n.children);
+            }
+        });
+    };
+
     files.forEach((file) => {
-        const parts = file.file_path.split('/');
+        // Normalize path separators (handle both \ and /) and split
+        const normalizedPath = file.file_path.replace(/\\/g, '/');
+        const parts = normalizedPath.split('/').filter(p => p); // filter out empty parts
         let current = root;
+
         parts.forEach((part, index) => {
             const isFile = index === parts.length - 1;
             const existing = current.children?.find((child) => child.name === part);
@@ -62,6 +89,10 @@ const buildTree = (files: { id: number; file_path: string; language?: string }[]
         });
     });
 
+    if (root.children && root.children.length > 0) {
+        sortNodes(root.children);
+    }
+
     return root.children || [];
 };
 
@@ -70,17 +101,17 @@ export const api = {
         const user = await request<{ id: number; email: string }>('/auth/me');
         return { id: user.id.toString(), email: user.email } as User;
     },
-    login: async (email: string, password: string) => {
+    login: async (email: string, password: string, rememberMe: boolean) => {
         const response = await request<{ user: { id: number; email: string } }>('/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email, password, remember_me: rememberMe }),
         });
         return { user: { id: response.user.id.toString(), email: response.user.email } } as { user: User };
     },
-    signup: async (email: string, password: string) => {
+    signup: async (email: string, password: string, rememberMe: boolean = false) => {
         const response = await request<{ user: { id: number; email: string } }>('/auth/signup', {
             method: 'POST',
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email, password, remember_me: rememberMe }),
         });
         return { user: { id: response.user.id.toString(), email: response.user.email } } as { user: User };
     },

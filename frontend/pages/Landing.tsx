@@ -2,8 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Code, GitBranch, Terminal, Zap, FileSearch, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { useAuthStore } from '../store';
 
 export const Landing: React.FC = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
       {/* Navbar */}
@@ -23,10 +26,20 @@ export const Landing: React.FC = () => {
               <a href="#docs" className="text-sm font-medium text-gray-500 hover:text-primary transition-colors">Docs</a>
             </div>
             <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-sm font-semibold text-gray-600 hover:text-gray-900">Sign in</Link>
-              <Link to="/signup">
-                <Button size="md">Get Started</Button>
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link to="/dashboard">
+                    <Button size="md">Go to Dashboard</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="text-sm font-semibold text-gray-600 hover:text-gray-900">Sign in</Link>
+                  <Link to="/signup">
+                    <Button size="md">Get Started</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -45,13 +58,13 @@ export const Landing: React.FC = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-500">writes itself.</span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-500 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
-            Instantly ingest, analyze, and document your entire codebase. 
+            Instantly ingest, analyze, and document your entire codebase.
             Stop asking colleagues where the auth logic lives—ask CodeLens.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <Link to="/signup">
+            <Link to={isAuthenticated ? "/dashboard" : "/signup"}>
               <Button size="lg" className="shadow-xl shadow-indigo-200/50 hover:shadow-indigo-200/70 transition-shadow">
-                Start Exploring Free <ArrowRight className="ml-2 h-5 w-5" />
+                {isAuthenticated ? 'Go to Dashboard' : 'Start Exploring Free'} <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Button variant="secondary" size="lg" className="bg-white">
@@ -59,38 +72,38 @@ export const Landing: React.FC = () => {
               run npm install
             </Button>
           </div>
-          
+
           <div className="mt-20 relative rounded-2xl border border-gray-200 shadow-2xl overflow-hidden bg-gray-900 aspect-[16/9] max-w-5xl mx-auto group">
-             <div className="absolute inset-0 bg-gradient-to-tr from-gray-900 via-gray-900 to-indigo-900/20"></div>
-             <div className="relative p-4 md:p-8 flex flex-col items-center justify-center h-full text-center">
-                <Code size={64} className="text-white/20 mb-4 group-hover:text-primary/50 transition-colors duration-500" />
-                <p className="text-gray-400 font-mono text-sm">Interactive Demo Preview</p>
-             </div>
+            <div className="absolute inset-0 bg-gradient-to-tr from-gray-900 via-gray-900 to-indigo-900/20"></div>
+            <div className="relative p-4 md:p-8 flex flex-col items-center justify-center h-full text-center">
+              <Code size={64} className="text-white/20 mb-4 group-hover:text-primary/50 transition-colors duration-500" />
+              <p className="text-gray-400 font-mono text-sm">Interactive Demo Preview</p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* How it works */}
       <section className="py-24 bg-paper">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center mb-16">
-                <h2 className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Workflow</h2>
-                <h3 className="text-3xl font-display font-bold text-gray-900">From Code to Context in 3 Steps</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                  {[
-                      { step: "01", title: "Connect", desc: "Link your GitHub or GitLab repository securely." },
-                      { step: "02", title: "Index", desc: "Our AI engine parses structure, dependencies, and logic." },
-                      { step: "03", title: "Query", desc: "Chat with your codebase or browse auto-generated docs." }
-                  ].map((item, i) => (
-                      <div key={i} className="relative p-8 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
-                          <span className="text-6xl font-bold text-gray-100 absolute top-4 right-4 pointer-events-none">{item.step}</span>
-                          <h4 className="text-xl font-bold text-gray-900 mb-3 relative z-10">{item.title}</h4>
-                          <p className="text-gray-500 relative z-10">{item.desc}</p>
-                      </div>
-                  ))}
-              </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Workflow</h2>
+            <h3 className="text-3xl font-display font-bold text-gray-900">From Code to Context in 3 Steps</h3>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {[
+              { step: "01", title: "Connect", desc: "Link your GitHub or GitLab repository securely." },
+              { step: "02", title: "Index", desc: "Our AI engine parses structure, dependencies, and logic." },
+              { step: "03", title: "Query", desc: "Chat with your codebase or browse auto-generated docs." }
+            ].map((item, i) => (
+              <div key={i} className="relative p-8 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                <span className="text-6xl font-bold text-gray-100 absolute top-4 right-4 pointer-events-none">{item.step}</span>
+                <h4 className="text-xl font-bold text-gray-900 mb-3 relative z-10">{item.title}</h4>
+                <p className="text-gray-500 relative z-10">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* Features Grid */}
@@ -100,7 +113,7 @@ export const Landing: React.FC = () => {
             <h2 className="text-4xl font-display font-bold text-gray-900 mb-6">Engineered for Engineers.</h2>
             <p className="text-xl text-gray-500 max-w-2xl">Don't waste time reverse-engineering legacy code. We give you x-ray vision into complex systems.</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               { icon: <GitBranch className="text-white" size={20} />, color: "bg-blue-500", title: "Repo Ingestion", desc: "Connect GitHub, GitLab, or Bitbucket. We parse trees up to 10GB in seconds." },
@@ -126,35 +139,35 @@ export const Landing: React.FC = () => {
       <footer className="bg-white border-t border-gray-200 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-start">
           <div className="mb-8 md:mb-0">
-             <div className="flex items-center space-x-2 mb-4">
-                 <div className="bg-primary p-1.5 rounded-lg">
-                    <Code className="text-white" size={20} />
-                  </div>
-                <span className="font-bold text-gray-900 text-lg">CodeLens AI</span>
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="bg-primary p-1.5 rounded-lg">
+                <Code className="text-white" size={20} />
               </div>
-              <p className="text-gray-500 text-sm max-w-xs">Intelligent documentation for modern engineering teams.</p>
+              <span className="font-bold text-gray-900 text-lg">CodeLens AI</span>
+            </div>
+            <p className="text-gray-500 text-sm max-w-xs">Intelligent documentation for modern engineering teams.</p>
           </div>
           <div className="flex space-x-12">
-             <div>
-                 <h4 className="font-bold text-gray-900 mb-4">Product</h4>
-                 <ul className="space-y-2 text-sm text-gray-500">
-                     <li><a href="#" className="hover:text-primary">Features</a></li>
-                     <li><a href="#" className="hover:text-primary">Pricing</a></li>
-                     <li><a href="#" className="hover:text-primary">Changelog</a></li>
-                 </ul>
-             </div>
-             <div>
-                 <h4 className="font-bold text-gray-900 mb-4">Company</h4>
-                 <ul className="space-y-2 text-sm text-gray-500">
-                     <li><a href="#" className="hover:text-primary">About</a></li>
-                     <li><a href="#" className="hover:text-primary">Careers</a></li>
-                     <li><a href="#" className="hover:text-primary">Blog</a></li>
-                 </ul>
-             </div>
+            <div>
+              <h4 className="font-bold text-gray-900 mb-4">Product</h4>
+              <ul className="space-y-2 text-sm text-gray-500">
+                <li><a href="#" className="hover:text-primary">Features</a></li>
+                <li><a href="#" className="hover:text-primary">Pricing</a></li>
+                <li><a href="#" className="hover:text-primary">Changelog</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-900 mb-4">Company</h4>
+              <ul className="space-y-2 text-sm text-gray-500">
+                <li><a href="#" className="hover:text-primary">About</a></li>
+                <li><a href="#" className="hover:text-primary">Careers</a></li>
+                <li><a href="#" className="hover:text-primary">Blog</a></li>
+              </ul>
+            </div>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-gray-100 flex justify-between items-center">
-            <div className="text-sm text-gray-400">&copy; 2024 CodeLens Inc.</div>
+          <div className="text-sm text-gray-400">&copy; 2024 CodeLens Inc.</div>
         </div>
       </footer>
     </div>

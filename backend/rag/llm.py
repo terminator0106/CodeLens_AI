@@ -28,8 +28,14 @@ def _get_groq_client():
         raise HTTPException(status_code=503, detail="GROQ_API_KEY is not configured")
     try:
         from groq import Groq  # type: ignore
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Groq SDK is not installed") from exc
+    except (ModuleNotFoundError, ImportError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Groq SDK is not installed in the running Python environment. "
+                "Install the 'groq' package (and make sure Uvicorn is started from the same venv)."
+            ),
+        ) from exc
     _groq_client = Groq()
     return _groq_client
 

@@ -185,37 +185,98 @@ export const Dashboard: React.FC = () => {
           <div className="lg:col-span-1 space-y-6">
             <h2 className="text-lg font-bold text-gray-900 flex items-center">
               <Activity className="mr-2 text-primary" size={20} />
-              Recent Activity
+              Repository Intelligence
             </h2>
+
+            {/* Enhanced AI Summary */}
+            <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-primary rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute -right-6 -top-6 opacity-10">
+                <Zap size={120} />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center mb-4">
+                  <div className="bg-white/20 p-2 rounded-lg mr-3">
+                    <Zap size={20} className="text-amber-300" />
+                  </div>
+                  <h3 className="font-bold text-lg">AI Insights</h3>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <p className="text-indigo-100 leading-relaxed">
+                    Your codebase has <strong className="text-white">{overview.total_repos} {overview.total_repos === 1 ? 'repository' : 'repositories'}</strong> indexed with <strong className="text-white">{overview.total_files.toLocaleString()} files</strong> across multiple languages.
+                  </p>
+                  <p className="text-indigo-100 leading-relaxed">
+                    We've processed <strong className="text-white">{overview.total_chunks.toLocaleString()} semantic chunks</strong> to enable intelligent code search and contextual AI explanations.
+                  </p>
+                  <div className="bg-white/10 rounded-xl p-3 mt-4 border border-white/20">
+                    <div className="flex items-start">
+                      <CheckCircle2 size={16} className="text-green-300 mr-2 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-semibold text-white mb-1">Ready for Analysis</div>
+                        <div className="text-xs text-indigo-200">
+                          Your code is fully indexed and ready for AI-powered explanations, dependency mapping, and intelligent search.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <Button size="sm" variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20 mt-4 w-full">
+                  Ask AI About Your Code
+                </Button>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <ul className="space-y-6">
-                {[
-                  { text: "Indexed codelens-frontend", time: "2m ago", type: "success" },
-                  { text: "Explanation generated for auth.ts", time: "15m ago", type: "info" },
-                  { text: "Dependency graph updated", time: "1h ago", type: "neutral" },
-                  { text: "New branch detected: feat/ui", time: "3h ago", type: "neutral" }
-                ].map((activity, i) => (
-                  <li key={i} className="flex items-start space-x-3">
-                    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${activity.type === 'success' ? 'bg-green-500' : activity.type === 'info' ? 'bg-blue-500' : 'bg-gray-300'
-                      }`} />
-                    <div>
-                      <p className="text-sm text-gray-800 font-medium">{activity.text}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{activity.time}</p>
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                <Clock size={16} className="mr-2 text-gray-400" />
+                Recent Activity
+              </h3>
+              <ul className="space-y-4">
+                {repositories.slice(0, 3).map((repo, i) => (
+                  <li key={i} className="flex items-start space-x-3 group">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 font-medium truncate group-hover:text-primary transition-colors">
+                        {repo.name}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {repo.fileCount} files indexed
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{repo.lastUpdated}</p>
                     </div>
                   </li>
                 ))}
+                {repositories.length === 0 && (
+                  <li className="text-sm text-gray-500 italic py-2">
+                    No repositories yet. Add one to get started!
+                  </li>
+                )}
               </ul>
-              <Button variant="ghost" size="sm" className="w-full mt-6 text-xs uppercase tracking-wide">View All Activity</Button>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-900 to-primary rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
-              <div className="relative z-10">
-                <h3 className="font-bold text-lg mb-2">Pro Tips</h3>
-                <p className="text-indigo-100 text-sm mb-4">You can ask the chat to "Refactor this component" to get modern React patterns.</p>
-                <Button size="sm" variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20">Try it now</Button>
-              </div>
-              <div className="absolute -right-4 -bottom-8 opacity-20">
-                <Zap size={100} />
+            {/* Quick Stats */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                <BarChart3 size={16} className="mr-2 text-primary" />
+                Quick Stats
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Avg Files/Repo</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {overview.total_repos > 0 ? Math.round(overview.total_files / overview.total_repos) : 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Avg Chunks/File</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {overview.total_files > 0 ? Math.round(overview.total_chunks / overview.total_files) : 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Indexing Coverage</span>
+                  <span className="text-sm font-bold text-green-600">100%</span>
+                </div>
               </div>
             </div>
           </div>

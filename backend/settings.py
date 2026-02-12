@@ -2,20 +2,40 @@ import os
 from pathlib import Path
 from typing import List
 
+BASE_DIR = Path(__file__).resolve().parent
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / "vectorstore" / "data"
 
 
 class Settings:
     """Application configuration loaded from environment variables."""
 
+    @staticmethod
+    def _normalize_database_url(value: str) -> str:
+        """Normalize DATABASE_URL so relative sqlite paths are stable.
+
+        If DATABASE_URL is set to something like `sqlite:///./codelens.db`, the
+        resolved file depends on the current working directory (which varies
+        based on how Uvicorn is launched). We resolve relative sqlite paths
+        against `backend/` so local development is consistent.
+        """
+
+        raw = (value or "").strip()
+        prefix = "sqlite:///./"
+        if raw.startswith(prefix):
+            relative_path = raw[len("sqlite:///") :]
+            absolute_path = (BASE_DIR / relative_path).resolve()
+            return f"sqlite:///{absolute_path.as_posix()}"
+        return raw
+
     def __init__(self) -> None:
         self.app_name = os.getenv("APP_NAME", "CodeLens AI Backend")
-        self.database_url = os.getenv("DATABASE_URL", "sqlite:///./codelens.db")
+        self.database_url = self._normalize_database_url(
+            os.getenv("DATABASE_URL", "sqlite:///./codelens.db")
+        )
         self.secret_key = os.getenv("SECRET_KEY", "change-me")
         self.algorithm = os.getenv("ALGORITHM", "HS256")
         self.access_token_expire_minutes = int(
@@ -23,6 +43,7 @@ class Settings:
         )
         self.cookie_name = os.getenv("COOKIE_NAME", "codelens_auth")
         self.secure_cookies = os.getenv("SECURE_COOKIES", "false").lower() == "true"
+        self.frontend_base_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
         self.allowed_origins = self._parse_origins(
             os.getenv(
                 "ALLOWED_ORIGINS",
@@ -45,6 +66,13 @@ class Settings:
         self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
         self.top_k = int(os.getenv("RAG_TOP_K", "4"))
         self.max_context_tokens = int(os.getenv("MAX_CONTEXT_TOKENS", "1800"))
+
+        # Optional OAuth (for GitHub/Google login). If client creds are not set,
+        # OAuth endpoints will return 503 with a clear message.
+        self.github_client_id = os.getenv("GITHUB_CLIENT_ID", "")
+        self.github_client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
+        self.google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+        self.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
         # Optional external compression provider (defaults to local token trimming)
         self.compression_provider = os.getenv("COMPRESSION_PROVIDER", "local")

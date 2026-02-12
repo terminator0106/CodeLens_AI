@@ -159,7 +159,24 @@ export const Chat: React.FC = () => {
                   ? 'bg-primary text-white rounded-br-none'
                   : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
                   }`}>
-                  {msg.content}
+                  {msg.role === 'ai' ? (
+                    <div className="space-y-2">
+                      {msg.content.split('\n').map((para, i) => {
+                        // Parse basic markdown: **bold**, *italic*, `code`
+                        const formatted = para
+                          .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                          .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
+                          .replace(/`(.+?)`/g, '<code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>');
+                        return para.trim() ? (
+                          <div key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
+                        ) : (
+                          <div key={i} className="h-2" />
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             </div>
