@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+faiss-cpu
+openai
+groq
+gitpython
+tiktoken
+python-dotenv
+passlib[bcrypt]
+python-jose
+pydantic
