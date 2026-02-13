@@ -15,8 +15,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-        <div 
-          className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity" 
+        <div
+          className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity"
           onClick={onClose}
         ></div>
 

@@ -231,8 +231,8 @@ export const Settings: React.FC = () => {
                                             >
                                                 Log out
                                             </Button>
-                                            <Button 
-                                                variant="danger" 
+                                            <Button
+                                                variant="danger"
                                                 size="sm"
                                                 className="hover:scale-105 transition-transform duration-200"
                                             >

@@ -6,17 +6,17 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  variant = 'primary', 
-  size = 'md', 
-  isLoading, 
-  className = '', 
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  variant = 'primary',
+  size = 'md',
+  isLoading,
+  className = '',
   disabled,
-  ...props 
+  ...props
 }) => {
   const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transform";
-  
+
   const variants = {
     primary: "bg-primary text-white hover:bg-indigo-800 focus:ring-primary shadow-soft hover:shadow-float hover:-translate-y-0.5",
     secondary: "bg-white/90 backdrop-blur-sm text-gray-700 border border-gray-200 hover:bg-white hover:text-gray-900 focus:ring-gray-200 shadow-card hover:shadow-soft",

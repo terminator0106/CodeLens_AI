@@ -82,7 +82,7 @@ export const Landing: React.FC = () => {
 
           {/* Interactive Demo Section */}
           <div className="mt-20 max-w-6xl mx-auto">
-            <div className="relative bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden">              
+            <div className="relative bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden">
               {/* Demo Content */}
               <div className="grid grid-cols-1 lg:grid-cols-2 h-[500px]">
                 {/* Code Viewer Panel (Left) */}
@@ -107,7 +107,7 @@ export const Landing: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Code Content */}
                   <div className="p-4 h-[435px] bg-white overflow-hidden">
                     <div className="font-mono text-sm leading-[1.6] text-left">
@@ -206,7 +206,7 @@ export const Landing: React.FC = () => {
                             </li>
                           </ul>
                         </div>
-                        
+
                         {/* Referenced Files */}
                         <div className="mt-3">
                           <p className="text-xs text-gray-500 font-medium mb-1.5">Referenced files:</p>

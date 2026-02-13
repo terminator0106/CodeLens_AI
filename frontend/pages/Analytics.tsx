@@ -107,7 +107,7 @@ export const Analytics: React.FC = () => {
             </div>
         </DashboardLayout>
     );
-    
+
     if (!data) return (
         <DashboardLayout>
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -163,8 +163,8 @@ export const Analytics: React.FC = () => {
                     { label: 'Avg Chunk Size', value: `${data.avg_chunk_size} tokens`, icon: <TrendingUp className="text-green-500" />, sub: 'Mean chunk token count', trend: 'neutral', gradient: 'from-green-50/80 to-green-100/60' },
                     { label: 'Ingestion Time', value: `${data.ingestion_time_ms} ms`, icon: <Zap className="text-amber-500" />, sub: 'Measured during latest ingestion', trend: 'neutral', gradient: 'from-amber-50/80 to-amber-100/60' },
                 ].map((stat, i) => (
-                    <div 
-                        key={i} 
+                    <div
+                        key={i}
                         className={`bg-gradient-to-br ${stat.gradient} backdrop-blur-md p-6 rounded-xl border border-white/20 shadow-float hover:shadow-glow transition-all duration-300 group hover:scale-105 animate-fade-in`}
                         style={{ animationDelay: `${i * 100 + 300}ms` }}
                     >
@@ -203,7 +203,7 @@ export const Analytics: React.FC = () => {
                             const percentage = Math.max(2, Math.round((count / maxLang) * 100));
                             const colors = [
                                 'from-blue-400 to-blue-600',
-                                'from-purple-400 to-purple-600', 
+                                'from-purple-400 to-purple-600',
                                 'from-green-400 to-green-600',
                                 'from-amber-400 to-amber-600',
                                 'from-rose-400 to-rose-600',
@@ -212,7 +212,7 @@ export const Analytics: React.FC = () => {
                                 'from-teal-400 to-teal-600'
                             ];
                             const gradientClass = colors[index % colors.length];
-                            
+
                             return (
                                 <div key={lang} className="group">
                                     <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-3">
@@ -223,8 +223,8 @@ export const Analytics: React.FC = () => {
                                         <span className="text-gray-600 font-semibold">{count} files</span>
                                     </div>
                                     <div className="w-full bg-gray-100/60 backdrop-blur-md rounded-full h-3 overflow-hidden shadow-inner">
-                                        <div 
-                                            className={`bg-gradient-to-r ${gradientClass} h-3 rounded-full transition-all duration-1000 ease-out shadow-sm group-hover:shadow-md`} 
+                                        <div
+                                            className={`bg-gradient-to-r ${gradientClass} h-3 rounded-full transition-all duration-1000 ease-out shadow-sm group-hover:shadow-md`}
                                             style={{ width: `${percentage}%` }}
                                         ></div>
                                     </div>
@@ -253,14 +253,14 @@ export const Analytics: React.FC = () => {
                                 const pct = Math.round((count / Math.max(1, data.files)) * 100);
                                 const colors = [
                                     'from-blue-400 to-blue-600',
-                                    'from-purple-400 to-purple-600', 
+                                    'from-purple-400 to-purple-600',
                                     'from-green-400 to-green-600',
                                     'from-amber-400 to-amber-600',
                                     'from-rose-400 to-rose-600',
                                     'from-indigo-400 to-indigo-600'
                                 ];
                                 const gradientClass = colors[index % colors.length];
-                                
+
                                 return (
                                     <div key={lang} className="group">
                                         <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
@@ -271,8 +271,8 @@ export const Analytics: React.FC = () => {
                                             <span className="text-gray-600 font-semibold">{pct}%</span>
                                         </div>
                                         <div className="w-full bg-gray-100/60 backdrop-blur-md rounded-full h-2 overflow-hidden shadow-inner">
-                                            <div 
-                                                className={`bg-gradient-to-r ${gradientClass} h-2 rounded-full transition-all duration-1000 ease-out`} 
+                                            <div
+                                                className={`bg-gradient-to-r ${gradientClass} h-2 rounded-full transition-all duration-1000 ease-out`}
                                                 style={{ width: `${Math.max(2, pct)}%` }}
                                             ></div>
                                         </div>
