@@ -12,6 +12,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    profile_image_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     repositories = relationship(
@@ -65,3 +66,24 @@ class CodeChunk(Base):
     token_count = Column(Integer, nullable=False)
 
     file = relationship("CodeFile", back_populates="chunks")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    repo_id = Column(Integer, ForeignKey("repositories.id"), nullable=False, index=True)
+
+    question = Column(Text, nullable=False)
+    question_normalized = Column(String, nullable=False, index=True)
+
+    answer = Column(Text, nullable=False)
+    referenced_files_json = Column(Text, nullable=False, default="[]")
+
+    token_usage = Column(Integer, nullable=False, default=0)
+    latency_ms = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
+    repository = relationship("Repository")

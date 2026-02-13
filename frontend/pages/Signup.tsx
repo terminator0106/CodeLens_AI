@@ -24,28 +24,33 @@ export const Signup: React.FC = () => {
   }, [isAuthenticated, navigate]);
 
   return (
-    <div className="min-h-screen bg-paper flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
-      <div className="absolute top-6 left-6">
-        <Link to="/" className="flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+    <div className="min-h-screen bg-paper flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-blue-50/30 to-purple-50/50"></div>
+      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-gradient-radial from-emerald-200/40 to-transparent rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-gradient-radial from-blue-200/30 to-transparent rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
+      
+      <div className="absolute top-6 left-6 z-10">
+        <Link to="/" className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 transition-all duration-300 bg-white/60 backdrop-blur-md px-4 py-2 rounded-lg shadow-float hover:shadow-glow">
           <ArrowLeft size={18} className="mr-2" />
           Back to Home
         </Link>
       </div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-[480px] text-center">
-        <div className="mx-auto bg-primary h-14 w-14 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-200">
-          <Code className="text-white" size={32} />
+      <div className="sm:mx-auto sm:w-full sm:max-w-[480px] text-center z-10">
+        <div className="mx-auto bg-gradient-to-br from-emerald-500 to-blue-600 h-16 w-16 rounded-2xl flex items-center justify-center mb-8 shadow-float animate-fade-in">
+          <Code className="text-white" size={36} />
         </div>
-        <h2 className="text-3xl font-display font-bold text-gray-900 tracking-tight">Create your account</h2>
-        <p className="mt-3 text-base text-gray-600">
+        <h2 className="text-4xl font-display font-bold text-gray-900 tracking-tight animate-fade-in animation-delay-200">Create your account</h2>
+        <p className="mt-4 text-lg text-gray-600 animate-fade-in animation-delay-300">
           Join 10,000+ developers documenting with AI
         </p>
       </div>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
-        <div className="bg-white py-10 px-6 shadow-soft rounded-2xl border border-gray-100 sm:px-12">
+      <div className="mt-12 sm:mx-auto sm:w-full sm:max-w-[480px] z-10">
+        <div className="bg-white/90 backdrop-blur-md py-12 px-8 shadow-float hover:shadow-glow rounded-2xl border border-white/20 sm:px-12 transition-all duration-500 animate-fade-in animation-delay-400">
           <form
-            className="space-y-6"
+            className="space-y-8"
             onSubmit={async (e) => {
               e.preventDefault();
               setError('');
@@ -103,23 +108,31 @@ export const Signup: React.FC = () => {
             />
 
             <div className="flex items-center pt-2">
-              <input id="terms" name="terms" type="checkbox" className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" required />
-              <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-                I agree to the <a href="#" className="font-medium text-primary hover:underline">Terms</a> and <a href="#" className="font-medium text-primary hover:underline">Privacy Policy</a>
+              <input 
+                id="terms" 
+                name="terms" 
+                type="checkbox" 
+                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded shadow-sm transition-all" 
+                required 
+              />
+              <label htmlFor="terms" className="ml-3 block text-sm text-gray-700">
+                I agree to the <a href="#" className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors">Terms</a> and <a href="#" className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors">Privacy Policy</a>
               </label>
             </div>
 
-            <Button type="submit" className="w-full" size="lg" isLoading={loading}>
+            <Button type="submit" className="w-full hover:scale-105 transition-transform duration-200" size="lg" isLoading={loading}>
               Create Account
             </Button>
             {error && (
-              <p className="text-sm text-red-600 text-center">{error}</p>
+              <div className="p-4 bg-red-50/80 backdrop-blur-md border border-red-200/50 rounded-lg">
+                <p className="text-sm text-red-700 text-center font-medium">{error}</p>
+              </div>
             )}
           </form>
 
-          <p className="mt-8 text-center text-sm text-gray-600">
+          <p className="mt-10 text-center text-sm text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-primary hover:text-indigo-700 transition-colors">
+            <Link to="/login" className="font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
               Log in instead
             </Link>
           </p>

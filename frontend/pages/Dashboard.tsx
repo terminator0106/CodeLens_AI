@@ -3,13 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { useRepoStore, useAuthStore } from '../store';
 import { api } from '../services/api';
-import { Plus, GitBranch, Clock, FileCode, CheckCircle2, Zap, BarChart3, ArrowRight, Activity, Search } from 'lucide-react';
+import { Plus, GitBranch, Clock, FileCode, CheckCircle2, Zap, BarChart3, ArrowRight, Activity, Search, Trash2, Filter, ChevronDown } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 
 export const Dashboard: React.FC = () => {
-  const { repositories, setRepositories, addRepository } = useRepoStore();
+  const { repositories, filteredRepositories, setRepositories, addRepository, removeRepository } = useRepoStore();
   const user = useAuthStore((state) => state.user);
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState({ total_repos: 0, total_files: 0, total_chunks: 0, last_ingestion_time: null as string | null });
@@ -21,6 +21,35 @@ export const Dashboard: React.FC = () => {
   const [branch, setBranch] = useState('main');
   const [ingesting, setIngesting] = useState(false);
   const [ingestProgress, setIngestProgress] = useState(0);
+
+  // Delete Repo State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [repoToDelete, setRepoToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Filter and Sort State
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [languageFilter, setLanguageFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('recent');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Close filter dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.filter-dropdown')) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    if (isFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterOpen]);
 
   useEffect(() => {
     const loadRepos = async () => {
@@ -73,6 +102,69 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteRepo = async () => {
+    if (!repoToDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteRepo(repoToDelete);
+      removeRepository(repoToDelete);
+      setDeleteModalOpen(false);
+      setRepoToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete repository:', error);
+      alert((error as Error).message || 'Failed to delete repository');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirmDelete = (repoId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setRepoToDelete(repoId);
+    setDeleteModalOpen(true);
+  };
+
+  const applyFiltersAndSort = (repos: typeof repositories) => {
+    let filtered = [...repos];
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(repo => {
+        if (statusFilter === 'completed') return repo.status === 'indexed';
+        if (statusFilter === 'progress') return repo.status === 'ingesting';
+        if (statusFilter === 'failed') return repo.status === 'failed';
+        return true;
+      });
+    }
+
+    // Apply language filter
+    if (languageFilter !== 'all') {
+      filtered = filtered.filter(repo => repo.language === languageFilter);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          return new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime();
+        case 'largest':
+          return (b.fileCount || 0) - (a.fileCount || 0);
+        case 'mostFiles':
+          return (b.fileCount || 0) - (a.fileCount || 0);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  const getAvailableLanguages = () => {
+    const languages = new Set(repositories.map(repo => repo.language).filter(Boolean));
+    return Array.from(languages).sort();
+  };
+
   const stats = [
     { label: 'Total Repositories', value: overview.total_repos, icon: <GitBranch size={20} />, color: 'bg-blue-100 text-blue-600' },
     { label: 'Files Indexed', value: overview.total_files, icon: <FileCode size={20} />, color: 'bg-purple-100 text-purple-600' },
@@ -100,15 +192,15 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Overview Stats */}
+        {/* Enhanced Overview Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {stats.map((stat, i) => (
-            <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+            <div key={i} className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl border border-white/50 shadow-card hover:shadow-float transition-all duration-300 flex items-center justify-between group">
               <div>
-                <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1 font-display">{stat.value}</p>
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{stat.label}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2 font-display tracking-tight">{stat.value.toLocaleString()}</p>
               </div>
-              <div className={`p-3 rounded-lg ${stat.color}`}>
+              <div className={`p-4 rounded-2xl ${stat.color} group-hover:scale-110 transition-transform duration-300 shadow-soft`}>
                 {stat.icon}
               </div>
             </div>
@@ -123,9 +215,76 @@ export const Dashboard: React.FC = () => {
                 <FolderGit2Icon className="mr-2 text-primary" size={20} />
                 Your Repositories
               </h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                <input type="text" placeholder="Filter..." className="pl-9 pr-4 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
+              <div className="flex items-center space-x-3">
+                {/* Repository Filter */}
+                <div className="relative filter-dropdown">
+                  <button
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className="flex items-center space-x-2 px-4 py-3 text-sm border border-white/50 rounded-xl bg-white/80 backdrop-blur-sm hover:bg-white/90 transition-all shadow-card hover:shadow-soft"
+                  >
+                    <Filter size={16} className="text-gray-400" />
+                    <span className="text-gray-700 font-medium">Filter & Sort</span>
+                    <ChevronDown size={16} className="text-gray-400" />
+                  </button>
+                  {isFilterOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-white/95 backdrop-blur-xl rounded-2xl shadow-float border border-white/50 z-20">
+                      <div className="p-6 space-y-5">
+                        {/* Status Filter */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-2">Status</label>
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                          >
+                            <option value="all">All Status</option>
+                            <option value="completed">Completed</option>
+                            <option value="progress">In Progress</option>
+                            <option value="failed">Failed</option>
+                          </select>
+                        </div>
+                        {/* Language Filter */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-2">Language</label>
+                          <select
+                            value={languageFilter}
+                            onChange={(e) => setLanguageFilter(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                          >
+                            <option value="all">All Languages</option>
+                            {getAvailableLanguages().map(lang => (
+                              <option key={lang} value={lang}>{lang}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* Sort Options */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-2">Sort By</label>
+                          <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                          >
+                            <option value="recent">Recently Ingested</option>
+                            <option value="largest">Largest Repository</option>
+                            <option value="mostFiles">Most Files</option>
+                          </select>
+                        </div>
+                        {/* Reset Filter */}
+                        <button
+                          onClick={() => {
+                            setStatusFilter('all');
+                            setLanguageFilter('all');
+                            setSortBy('recent');
+                          }}
+                          className="w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          Reset Filters
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -137,44 +296,71 @@ export const Dashboard: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {repositories.map((repo) => (
-                  <Link to={`/repo/${repo.id}`} key={repo.id} className="block group">
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 hover:border-primary/50 hover:shadow-md transition-all duration-200 relative overflow-hidden">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-start space-x-4">
-                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 group-hover:bg-primary/5 transition-colors">
-                            <FileCode size={24} className="text-gray-600 group-hover:text-primary transition-colors" />
+                {applyFiltersAndSort(filteredRepositories).map((repo) => (
+                  <div key={repo.id} className="relative group">
+                    <Link to={`/repo/${repo.id}`} className="block">
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 hover:border-primary/50 hover:shadow-md transition-all duration-200 relative overflow-hidden">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-start space-x-4">
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 group-hover:bg-primary/5 transition-colors">
+                              <FileCode size={24} className="text-gray-600 group-hover:text-primary transition-colors" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-gray-900 font-display group-hover:text-primary transition-colors">{repo.name}</h3>
+                              <p className="text-sm text-gray-500 mt-1 line-clamp-1">{repo.description}</p>
+                              <div className="flex items-center space-x-4 mt-3 text-xs text-gray-400 font-medium">
+                                <span className="flex items-center"><GitBranch size={12} className="mr-1" /> {repo.branch}</span>
+                                <span className="flex items-center"><Clock size={12} className="mr-1" /> {repo.lastUpdated}</span>
+                                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{repo.language}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900 font-display group-hover:text-primary transition-colors">{repo.name}</h3>
-                            <p className="text-sm text-gray-500 mt-1 line-clamp-1">{repo.description}</p>
-                            <div className="flex items-center space-x-4 mt-3 text-xs text-gray-400 font-medium">
-                              <span className="flex items-center"><GitBranch size={12} className="mr-1" /> {repo.branch}</span>
-                              <span className="flex items-center"><Clock size={12} className="mr-1" /> {repo.lastUpdated}</span>
-                              <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{repo.language}</span>
+                          <div className="flex items-center gap-2">
+                            <div className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${repo.status === 'indexed' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                              }`}>
+                              {repo.status}
                             </div>
                           </div>
                         </div>
-                        <div className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${repo.status === 'indexed' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100'
-                          }`}>
-                          {repo.status}
+                        <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
+                          <ArrowRight className="text-gray-400 group-hover:text-primary" />
                         </div>
                       </div>
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
-                        <ArrowRight className="text-gray-400 group-hover:text-primary" />
-                      </div>
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
                 ))}
 
-                {repositories.length === 0 && (
-                  <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                    <div className="bg-gray-50 p-4 rounded-full inline-flex mb-4">
-                      <Plus size={32} className="text-gray-400" />
+                {applyFiltersAndSort(filteredRepositories).length === 0 && repositories.length === 0 && (
+                  <div className="text-center py-20 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-gray-300 shadow-card">
+                    <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-full inline-flex mb-6 shadow-soft">
+                      <Plus size={40} className="text-gray-400" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900">No repositories yet</h3>
-                    <p className="text-gray-500 mb-6">Import a repository to start generating documentation.</p>
-                    <Button variant="outline" onClick={() => setAddModalOpen(true)}>Import Repository</Button>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No repositories yet</h3>
+                    <p className="text-gray-500 mb-8 max-w-md mx-auto leading-relaxed">Import your first repository to start generating intelligent documentation and AI-powered code insights.</p>
+                    <Button variant="primary" onClick={() => setAddModalOpen(true)} className="shadow-glow">
+                      <Plus size={18} className="mr-2" />
+                      Import Repository
+                    </Button>
+                  </div>
+                )}
+
+                {applyFiltersAndSort(filteredRepositories).length === 0 && repositories.length > 0 && (
+                  <div className="text-center py-20 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-gray-300 shadow-card">
+                    <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-full inline-flex mb-6 shadow-soft">
+                      <Search size={40} className="text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No repositories found</h3>
+                    <p className="text-gray-500 mb-8 max-w-md mx-auto leading-relaxed">Try adjusting your search terms or filter settings to find what you're looking for.</p>
+                    <button
+                      onClick={() => {
+                        setStatusFilter('all');
+                        setLanguageFilter('all');
+                        setSortBy('recent');
+                      }}
+                      className="px-6 py-3 text-sm font-medium text-primary hover:bg-primary hover:text-white border-2 border-primary rounded-xl transition-all duration-200 shadow-card hover:shadow-soft backdrop-blur-sm"
+                    >
+                      Clear Filters
+                    </button>
                   </div>
                 )}
               </div>
@@ -219,7 +405,19 @@ export const Dashboard: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <Button size="sm" variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20 mt-4 w-full">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="bg-white/10 text-white border-white/20 hover:bg-white/20 mt-4 w-full"
+                  onClick={() => {
+                    if (repositories.length > 0) {
+                      const repoToSelect = repositories.find(r => r.status === 'indexed') || repositories[0];
+                      navigate(`/chat?repo=${repoToSelect.id}`);
+                    } else {
+                      navigate('/chat');
+                    }
+                  }}
+                >
                   Ask AI About Your Code
                 </Button>
               </div>
@@ -347,6 +545,53 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Delete Repo Confirmation Modal */}
+      <Modal
+        isOpen={deleteModalOpen}
+        onClose={() => !deleting && setDeleteModalOpen(false)}
+        title="Delete Repository"
+        footer={
+          <>
+            <Button
+              onClick={handleDeleteRepo}
+              disabled={deleting}
+              isLoading={deleting}
+              className="w-full sm:w-auto sm:ml-3 bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteModalOpen(false)}
+              disabled={deleting}
+              className="w-full sm:w-auto mt-3 sm:mt-0"
+            >
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-800 font-medium">
+              ⚠️ This action cannot be undone.
+            </p>
+          </div>
+          <p className="text-sm text-gray-700">
+            This will permanently delete the repository and all associated data including:
+          </p>
+          <ul className="text-sm text-gray-600 list-disc list-inside space-y-1 ml-2">
+            <li>All indexed files and code chunks</li>
+            <li>Vector embeddings and FAISS index</li>
+            <li>Chat history for this repository</li>
+            <li>Analytics and metadata</li>
+          </ul>
+          <p className="text-sm text-gray-700 font-medium">
+            Are you sure you want to delete <span className="text-red-600">{repositories.find(r => r.id === repoToDelete)?.name}</span>?
+          </p>
         </div>
       </Modal>
     </DashboardLayout>

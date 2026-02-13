@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   avatarUrl?: string;
+  profile_image_url?: string;
 }
 
 export interface Repository {

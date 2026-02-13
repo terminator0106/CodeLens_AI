@@ -76,3 +76,25 @@ def search(repo_id: int, query_vector: List[float], top_k: int) -> Tuple[List[in
 def get_metadata(repo_id: int) -> List[dict]:
     """Return metadata rows for a repo index."""
     return METADATA.get(repo_id, [])
+
+
+def delete_index(base_dir: Path, repo_id: int) -> None:
+    """Delete the FAISS index and metadata for a repo from memory and disk."""
+    # Remove from memory
+    if repo_id in INDEXES:
+        del INDEXES[repo_id]
+    if repo_id in METADATA:
+        del METADATA[repo_id]
+    
+    # Remove from disk
+    try:
+        index_file = _index_path(base_dir, repo_id)
+        if index_file.exists():
+            index_file.unlink()
+        
+        from .metadata import metadata_path
+        metadata_file = metadata_path(base_dir, repo_id)
+        if metadata_file.exists():
+            metadata_file.unlink()
+    except Exception:
+        logger.exception("Failed to delete index files for repo %s", repo_id)

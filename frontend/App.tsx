@@ -8,6 +8,10 @@ import { RepoView } from './pages/RepoView';
 import { Chat } from './pages/Chat';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
+import { Products } from './pages/Products';
+import { Solutions } from './pages/Solutions';
+import { Pricing } from './pages/Pricing';
+import { Docs } from './pages/Docs';
 import { useAuthStore } from './store';
 import { api } from './services/api';
 
@@ -44,6 +48,10 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/solutions" element={<Solutions />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/docs" element={<Docs />} />
 
         {/* Protected Routes */}
         <Route path="/dashboard" element={

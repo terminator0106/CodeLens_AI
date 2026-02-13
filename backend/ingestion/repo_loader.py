@@ -18,7 +18,7 @@ from database.db import get_db
 from database.db import SessionLocal
 from database.models import CodeChunk, CodeFile
 from schemas.api_models import RepoFilesResponse, RepoIngestRequest, RepoResponse, FileResponse, FileContentResponse
-from schemas.api_models import RepoIngestResponse
+from schemas.api_models import RepoIngestResponse, RepoReingestRequest
 from schemas.api_models import FileExplainResponse, FileMetricsResponse, RepoAnalyticsResponse
 from vectorstore.faiss_index import add_embeddings
 from .file_reader import read_code_files
@@ -61,6 +61,39 @@ def _read_repo_stats(repo_id: int) -> dict:
     except Exception:
         logger.exception("Failed to read repo stats repo_id=%s", repo_id)
         return {}
+
+
+def _reset_repo_data(db: Session, repo_id: int) -> None:
+    """Delete indexed files, chunks, stats, and FAISS index for a repo.
+
+    Used when re-running ingestion so we don't duplicate rows or vectors.
+    """
+
+    # Delete chunks first (FK to files), then files themselves.
+    try:
+        file_ids_subq = db.query(CodeFile.id).filter(CodeFile.repo_id == repo_id).subquery()
+        db.query(CodeChunk).filter(CodeChunk.file_id.in_(file_ids_subq)).delete(synchronize_session=False)
+        db.query(CodeFile).filter(CodeFile.repo_id == repo_id).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to clear existing repo data repo_id=%s", repo_id)
+        raise
+
+    # Best-effort cleanup of stats file and FAISS index.
+    try:
+        stats_file = _stats_path(repo_id)
+        if stats_file.exists():
+            stats_file.unlink()
+    except Exception:
+        logger.warning("Failed to delete stats file during reset repo_id=%s", repo_id)
+
+    try:
+        from vectorstore.faiss_index import delete_index
+
+        delete_index(DATA_DIR, repo_id)
+    except Exception:
+        logger.warning("Failed to delete FAISS index during reset repo_id=%s", repo_id)
 
 
 def _validate_repo_url(url: str) -> None:
@@ -117,6 +150,55 @@ def ingest_repo(
     )
 
 
+@router.post("/{repo_id}/reingest", response_model=RepoIngestResponse)
+def reingest_repo(
+    repo_id: int,
+    payload: RepoReingestRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Re-run ingestion for an existing repository.
+
+    This clears previously indexed files/chunks and associated vector indexes,
+    then schedules a fresh ingestion run using the stored repo_url.
+    """
+
+    repo = crud.get_repo_by_id_any(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    if repo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    branch = payload.branch or "main"
+    _validate_repo_url(repo.repo_url)
+
+    try:
+        _reset_repo_data(db, repo_id)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to reset repository before re-ingestion")
+
+    background_tasks.add_task(
+        _run_ingestion_task,
+        repo_id=repo.id,
+        repo_url=repo.repo_url,
+        branch=branch,
+        user_id=current_user.id,
+    )
+
+    return RepoIngestResponse(
+        repo_id=repo.id,
+        files=0,
+        chunks=0,
+        id=repo.id,
+        repo_url=repo.repo_url,
+        repo_name=repo.repo_name,
+        created_at=repo.created_at.isoformat(),
+        status="reingest_started",
+        file_count=0,
+    )
+
+
 def _run_ingestion_task(repo_id: int, repo_url: str, branch: str, user_id: int) -> None:
     """Background ingestion task. Must not raise into the request lifecycle."""
 
@@ -135,7 +217,7 @@ def _run_ingestion_task(repo_id: int, repo_url: str, branch: str, user_id: int) 
         logger.info("Ingestion start repo_id=%s url=%s branch=%s", repo_id, repo_url, branch)
 
         # Embeddings are always optional and must never block ingestion.
-        embeddings_enabled = (not settings.disable_embeddings) and bool(os.getenv("OPENAI_API_KEY"))
+        embeddings_enabled = (not settings.disable_embeddings) and bool(os.getenv("OPENROUTER_API_KEY"))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -456,8 +538,8 @@ def explain_file(
     provider = (settings.llm_provider or "").strip().lower() or "groq"
     if provider == "groq" and not os.getenv("GROQ_API_KEY"):
         return FileExplainResponse(message="LLM is not configured (GROQ_API_KEY is not set).", referenced_chunks=[])
-    if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
-        return FileExplainResponse(message="LLM is not configured (OPENAI_API_KEY is not set).", referenced_chunks=[])
+    if provider == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
+        return FileExplainResponse(message="LLM is not configured (OPENROUTER_API_KEY is not set).", referenced_chunks=[])
 
     # Build a context strictly from this file's chunks.
     max_tokens = max(200, int(settings.max_context_tokens or 1800))
@@ -543,3 +625,39 @@ def repo_analytics(
         avg_chunk_size=int(base.get("avg_chunk_size") or 0),
         ingestion_time_ms=ingestion_time_ms,
     )
+
+
+@router.delete("/{repo_id}")
+def delete_repository(
+    repo_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Delete a repository and all its associated data (files, chunks, FAISS index, chat history)."""
+    repo = crud.get_repo_by_id_any(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    if repo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    try:
+        crud.delete_repo(db, repo_id)
+        # Best-effort cleanup of stats file and FAISS index
+        try:
+            stats_file = _stats_path(repo_id)
+            if stats_file.exists():
+                stats_file.unlink()
+        except Exception:
+            logger.warning("Failed to delete stats file for repo_id=%s", repo_id)
+
+        try:
+            from vectorstore.faiss_index import delete_index
+            delete_index(DATA_DIR, repo_id)
+        except Exception:
+            logger.warning("Failed to delete FAISS index for repo_id=%s", repo_id)
+
+        logger.info("Repository deleted repo_id=%s user_id=%s", repo_id, current_user.id)
+        return {"status": "deleted", "repo_id": repo_id}
+    except Exception as exc:
+        logger.exception("Failed to delete repository repo_id=%s", repo_id)
+        raise HTTPException(status_code=500, detail="Failed to delete repository") from exc

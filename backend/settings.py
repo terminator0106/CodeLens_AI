@@ -61,8 +61,9 @@ class Settings:
         self.disable_embeddings = os.getenv("DISABLE_EMBEDDINGS", "false").lower() == "true"
         self.embeddings_batch_size = int(os.getenv("EMBEDDINGS_BATCH_SIZE", "64"))
         self.embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-        self.chat_model = os.getenv("CHAT_MODEL", "gpt-4o-mini")
+        self.chat_model = os.getenv("CHAT_MODEL", "openai/gpt-4o-mini")
         self.llm_provider = os.getenv("LLM_PROVIDER", "groq")
+        self.openrouter_base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
         self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
         self.top_k = int(os.getenv("RAG_TOP_K", "4"))
         self.max_context_tokens = int(os.getenv("MAX_CONTEXT_TOKENS", "1800"))

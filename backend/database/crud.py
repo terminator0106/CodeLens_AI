@@ -1,11 +1,85 @@
 from datetime import datetime
+import json
 import re
 from typing import Iterable, List, Optional, Sequence
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from .models import CodeChunk, CodeFile, Repository, User
+from .models import ChatMessage, CodeChunk, CodeFile, Repository, User
+
+
+def normalize_question(question: str) -> str:
+    """Normalize question text for stable cache keys."""
+
+    q = (question or "").strip().lower()
+    q = re.sub(r"\s+", " ", q)
+    return q
+
+
+def get_cached_chat_message(db: Session, user_id: int, repo_id: int, question: str) -> Optional[ChatMessage]:
+    """Return the most recent cached answer for an identical normalized question."""
+
+    qn = normalize_question(question)
+    return (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.repo_id == repo_id,
+            ChatMessage.question_normalized == qn,
+        )
+        .order_by(ChatMessage.created_at.desc())
+        .first()
+    )
+
+
+def create_chat_message(
+    db: Session,
+    *,
+    user_id: int,
+    repo_id: int,
+    question: str,
+    answer: str,
+    referenced_files: List[str],
+    token_usage: int,
+    latency_ms: int,
+) -> ChatMessage:
+    """Persist a single chat turn (question + answer)."""
+
+    msg = ChatMessage(
+        user_id=user_id,
+        repo_id=repo_id,
+        question=question,
+        question_normalized=normalize_question(question),
+        answer=answer,
+        referenced_files_json=json.dumps(sorted(set(referenced_files or []))),
+        token_usage=int(token_usage or 0),
+        latency_ms=int(latency_ms or 0),
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    return msg
+
+
+def list_chat_messages_by_repo(
+    db: Session,
+    *,
+    user_id: int,
+    repo_id: int,
+    limit: int = 100,
+) -> List[ChatMessage]:
+    """Return recent chat turns for the repo, newest last."""
+
+    limit_val = max(1, min(int(limit or 100), 500))
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user_id, ChatMessage.repo_id == repo_id)
+        .order_by(ChatMessage.created_at.asc())
+        .limit(limit_val)
+        .all()
+    )
+    return list(rows or [])
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
@@ -24,6 +98,16 @@ def create_user(db: Session, email: str, hashed_password: str) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    return user
+
+
+def update_user_profile_image(db: Session, user_id: int, profile_image_url: str) -> Optional[User]:
+    """Update a user's profile image URL."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        user.profile_image_url = profile_image_url
+        db.commit()
+        db.refresh(user)
     return user
 
 

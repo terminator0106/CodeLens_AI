@@ -9,6 +9,7 @@ class UserResponse(BaseModel):
 
     id: int
     email: str
+    profile_image_url: Optional[str] = None
 
 
 class SignupRequest(BaseModel):
@@ -54,6 +55,12 @@ class RepoIngestResponse(BaseModel):
     created_at: str
     status: str
     file_count: int
+
+
+class RepoReingestRequest(BaseModel):
+    """Request body for re-running ingestion on an existing repository."""
+
+    branch: Optional[str] = "main"
 
 
 class FileResponse(BaseModel):
@@ -113,6 +120,19 @@ class QueryResponse(BaseModel):
     referenced_files: List[str]
     token_usage: int
     latency_ms: int
+    cached: bool = False
+
+
+class ChatHistoryMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    timestamp: str
+
+
+class ChatHistoryResponse(BaseModel):
+    repo_id: int
+    messages: List[ChatHistoryMessage]
 
 
 class AnalyticsResponse(BaseModel):

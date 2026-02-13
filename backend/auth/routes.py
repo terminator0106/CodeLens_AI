@@ -1,13 +1,15 @@
+import os
+import shutil
 from datetime import timedelta
 import secrets
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from settings import settings
+from settings import settings, DATA_DIR
 from database.db import get_db
 from database import crud
 from schemas.api_models import AuthResponse, LoginRequest, SignupRequest, UserResponse
@@ -87,6 +89,47 @@ def logout(response: Response):
 def me(current_user=Depends(get_current_user)):
     """Return the current authenticated user."""
     return UserResponse.model_validate(current_user)
+
+
+@router.post("/profile-image", response_model=UserResponse)
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload and update user's profile image."""
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Validate file size (5MB limit)
+    if file.size and file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+    
+    # Create uploads directory if it doesn't exist
+    uploads_dir = DATA_DIR / "uploads" / "profile_images"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    file_extension = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'jpg'
+    filename = f"user_{current_user.id}_{secrets.token_urlsafe(8)}.{file_extension}"
+    file_path = uploads_dir / filename
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Generate URL (in production, this would be a CDN URL)
+    profile_image_url = f"/uploads/profile_images/{filename}"
+    
+    # Update user in database
+    updated_user = crud.update_user_profile_image(db, current_user.id, profile_image_url)
+    if not updated_user:
+        # Clean up file if database update failed
+        os.unlink(file_path)
+        raise HTTPException(status_code=500, detail="Failed to update profile image")
+    
+    return UserResponse.model_validate(updated_user)
 
 
 @router.get("/oauth/github/start")

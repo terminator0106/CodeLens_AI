@@ -98,8 +98,30 @@ const buildTree = (files: { id: number; file_path: string; language?: string }[]
 
 export const api = {
     getMe: async () => {
-        const user = await request<{ id: number; email: string }>('/auth/me');
-        return { id: user.id.toString(), email: user.email } as User;
+        const user = await request<{ id: number; email: string; profile_image_url?: string }>('/auth/me');
+        return {
+            id: user.id.toString(),
+            email: user.email,
+            profile_image_url: user.profile_image_url
+        } as User & { profile_image_url?: string };
+    },
+
+    uploadProfileImage: async (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/auth/profile-image', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include', // Important for cookie auth
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
+            throw new Error(error.detail || 'Failed to upload image');
+        }
+
+        return await response.json();
     },
     login: async (email: string, password: string, rememberMe: boolean) => {
         const response = await request<{ user: { id: number; email: string } }>('/auth/login', {
@@ -151,6 +173,27 @@ export const api = {
             branch,
         };
     },
+    reingestRepo: async (repoId: string, branch: string = 'main'): Promise<void> => {
+        await request<{
+            repo_id: number;
+            files: number;
+            chunks: number;
+            id: number;
+            repo_url: string;
+            repo_name: string;
+            created_at: string;
+            status: string;
+            file_count: number;
+        }>(`/repos/${repoId}/reingest`, {
+            method: 'POST',
+            body: JSON.stringify({ branch }),
+        });
+    },
+    deleteRepo: async (repoId: string): Promise<void> => {
+        await request<{ status: string; repo_id: number }>(`/repos/${repoId}`, {
+            method: 'DELETE',
+        });
+    },
     fetchRepoFiles: async (repoId: string): Promise<FileNode[]> => {
         const data = await request<{ repo_id: number; files: { id: number; file_path: string; language?: string }[] }>(
             `/repos/${repoId}/files`
@@ -183,6 +226,11 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ repo_id: Number(repoId), question }),
         }),
+
+    fetchChatHistory: (repoId: string, limit: number = 100) =>
+        request<{ repo_id: number; messages: { id: string; role: 'user' | 'ai'; content: string; timestamp: string }[] }>(
+            `/repos/${repoId}/chat/history?limit=${encodeURIComponent(String(limit))}`
+        ),
     fetchAnalytics: async () => {
         const data = await request<{
             total_repos: number;

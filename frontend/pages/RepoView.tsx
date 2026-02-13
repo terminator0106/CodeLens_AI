@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FileTree } from '../components/repo/FileTree';
 import { CodeViewer } from '../components/repo/CodeViewer';
 import { useRepoStore } from '../store';
 import { api } from '../services/api';
 import { ChevronRight, ArrowLeft, MessageSquare, Box, Layers, BookOpen, Settings, Search, GitBranch, CheckCircle2, Zap, TrendingUp, Network, FileCode } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { FileNode } from '../types';
 
 export const RepoView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { fileTree, setFileTree, selectedFile, selectFile, repositories, setRepositories, selectRepo, selectedRepo } = useRepoStore();
+    const { fileTree, setFileTree, selectedFile, selectFile, repositories, setRepositories, selectRepo, selectedRepo, removeRepository } = useRepoStore();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'code' | 'explain' | 'deps'>('code');
     const [searchTerm, setSearchTerm] = useState('');
     const [treeLoading, setTreeLoading] = useState(true);
@@ -26,6 +28,19 @@ export const RepoView: React.FC = () => {
     const [metricsLoading, setMetricsLoading] = useState(false);
     const [metricsError, setMetricsError] = useState('');
     const [metrics, setMetrics] = useState<{ lines: number; chunks: number; avg_chunk_size: number } | null>(null);
+
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [settingsLoading, setSettingsLoading] = useState(false);
+    const [settingsError, setSettingsError] = useState('');
+    const [repoAnalytics, setRepoAnalytics] = useState<{
+        files: number;
+        chunks: number;
+        languages: Record<string, number>;
+        avg_chunk_size: number;
+        ingestion_time_ms: number;
+    } | null>(null);
+    const [reingesting, setReingesting] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         const loadRepoDetails = async () => {
@@ -133,6 +148,52 @@ export const RepoView: React.FC = () => {
         }
     };
 
+    const openSettings = async () => {
+        if (!id || !selectedRepo) return;
+        setIsSettingsOpen(true);
+        if (repoAnalytics || settingsLoading) return;
+        setSettingsLoading(true);
+        setSettingsError('');
+        try {
+            const analytics = await api.fetchRepoAnalytics(id);
+            setRepoAnalytics(analytics);
+        } catch (error) {
+            setSettingsError((error as Error).message || 'Unable to load repository analytics.');
+        } finally {
+            setSettingsLoading(false);
+        }
+    };
+
+    const handleReingest = async () => {
+        if (!id || !selectedRepo) return;
+        setReingesting(true);
+        try {
+            await api.reingestRepo(id, selectedRepo.branch || 'main');
+            alert('Re-ingestion started. This may take a few minutes.');
+        } catch (error) {
+            console.error('Failed to re-ingest repository:', error);
+            alert((error as Error).message || 'Failed to re-ingest repository');
+        } finally {
+            setReingesting(false);
+        }
+    };
+
+    const handleDeleteRepo = async () => {
+        if (!id) return;
+        setDeleting(true);
+        try {
+            await api.deleteRepo(id);
+            removeRepository(id);
+            setIsSettingsOpen(false);
+            navigate('/dashboard');
+        } catch (error) {
+            console.error('Failed to delete repository:', error);
+            alert((error as Error).message || 'Failed to delete repository');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     // Very basic filter logic (visual only for this mock)
     const filteredTree = searchTerm
         ? fileTree.map(node => ({
@@ -190,7 +251,13 @@ export const RepoView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center">
-                    <Button size="sm" variant="outline" className="hidden sm:flex">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="hidden sm:flex"
+                        onClick={openSettings}
+                        disabled={!selectedRepo}
+                    >
                         <Settings size={16} className="mr-2" /> Repo Settings
                     </Button>
                 </div>
@@ -433,6 +500,81 @@ export const RepoView: React.FC = () => {
                     )}
                 </main>
             </div>
+
+            <Modal
+                isOpen={isSettingsOpen}
+                onClose={() => !deleting && !reingesting && setIsSettingsOpen(false)}
+                title="Repository Settings"
+                footer={
+                    <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setIsSettingsOpen(false)}
+                            disabled={deleting || reingesting}
+                            className="w-full sm:w-auto"
+                        >
+                            Close
+                        </Button>
+                        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:justify-end">
+                            <Button
+                                onClick={handleReingest}
+                                disabled={reingesting || deleting || !selectedRepo}
+                                isLoading={reingesting}
+                                className="w-full sm:w-auto"
+                            >
+                                Re-run Ingestion
+                            </Button>
+                            <Button
+                                onClick={handleDeleteRepo}
+                                disabled={deleting}
+                                isLoading={deleting}
+                                className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                Delete Repository
+                            </Button>
+                        </div>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    {selectedRepo && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <h3 className="text-sm font-semibold text-gray-800 mb-2">Repository Metadata</h3>
+                            <p className="text-sm text-gray-700"><span className="font-medium">Name:</span> {selectedRepo.name}</p>
+                            <p className="text-sm text-gray-700 break-all"><span className="font-medium">URL:</span> {selectedRepo.url}</p>
+                            <p className="text-sm text-gray-700"><span className="font-medium">Branch:</span> {selectedRepo.branch}</p>
+                            <p className="text-sm text-gray-700"><span className="font-medium">Status:</span> {selectedRepo.status}</p>
+                        </div>
+                    )}
+
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-2">Ingestion Summary</h3>
+                        {settingsLoading && <p className="text-sm text-gray-500">Loading analytics…</p>}
+                        {settingsError && !settingsLoading && (
+                            <p className="text-sm text-red-600">{settingsError}</p>
+                        )}
+                        {repoAnalytics && !settingsLoading && !settingsError && (
+                            <div className="space-y-1 text-sm text-gray-700">
+                                <p><span className="font-medium">Files:</span> {repoAnalytics.files}</p>
+                                <p><span className="font-medium">Chunks:</span> {repoAnalytics.chunks}</p>
+                                <p><span className="font-medium">Avg chunk size:</span> {repoAnalytics.avg_chunk_size} tokens</p>
+                                <p><span className="font-medium">Ingestion time:</span> {repoAnalytics.ingestion_time_ms} ms</p>
+                            </div>
+                        )}
+                        {!settingsLoading && !settingsError && !repoAnalytics && (
+                            <p className="text-sm text-gray-500">No ingestion analytics found for this repository yet.</p>
+                        )}
+                    </div>
+
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-red-800 mb-1">Danger Zone</h3>
+                        <p className="text-sm text-red-700">
+                            Deleting this repository will permanently remove indexed files, code chunks, vector embeddings,
+                            chat history, and analytics. This action cannot be undone.
+                        </p>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

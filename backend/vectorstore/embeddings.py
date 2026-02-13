@@ -1,23 +1,35 @@
 from typing import List
 import os
 
-from openai import OpenAI
+import httpx
 
 from settings import settings
 
-_client: OpenAI | None = None
+
+def _get_openrouter_key() -> str:
+    key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("OPENROUTER_API_KEY is not set")
+    return key
 
 
-def _get_client() -> OpenAI:
-    global _client
-    if _client is not None:
-        return _client
+def _headers() -> dict:
+    headers = {
+        "Authorization": f"Bearer {_get_openrouter_key()}",
+        "Content-Type": "application/json",
+    }
+    referer = (os.getenv("OPENROUTER_SITE_URL") or "").strip()
+    title = (os.getenv("OPENROUTER_APP_NAME") or "").strip()
+    if referer:
+        headers["HTTP-Referer"] = referer
+    if title:
+        headers["X-Title"] = title
+    return headers
 
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("OPENAI_API_KEY is not set")
 
-    _client = OpenAI()
-    return _client
+def _embeddings_endpoint() -> str:
+    base_url = (getattr(settings, "openrouter_base_url", "") or "https://openrouter.ai/api/v1").rstrip("/")
+    return f"{base_url}/embeddings"
 
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
@@ -26,7 +38,6 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     if settings.disable_embeddings:
         raise RuntimeError("Embeddings are disabled (DISABLE_EMBEDDINGS=true)")
 
-    client = _get_client()
     if not texts:
         return []
 
@@ -34,8 +45,14 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     vectors: List[List[float]] = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
-        response = client.embeddings.create(model=settings.embedding_model, input=batch)
-        vectors.extend([item.embedding for item in response.data])
+
+        payload = {"model": settings.embedding_model, "input": batch}
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(_embeddings_endpoint(), headers=_headers(), json=payload)
+        if resp.status_code >= 400:
+            raise RuntimeError(f"OpenRouter embeddings failed: {resp.status_code} {resp.text[:500]}")
+        data = resp.json()
+        vectors.extend([item["embedding"] for item in (data.get("data") or []) if "embedding" in item])
     return vectors
 
 
@@ -45,6 +62,10 @@ def embed_query(text: str) -> List[float]:
     if settings.disable_embeddings:
         raise RuntimeError("Embeddings are disabled (DISABLE_EMBEDDINGS=true)")
 
-    client = _get_client()
-    response = client.embeddings.create(model=settings.embedding_model, input=[text])
-    return response.data[0].embedding
+    payload = {"model": settings.embedding_model, "input": [text]}
+    with httpx.Client(timeout=60) as client:
+        resp = client.post(_embeddings_endpoint(), headers=_headers(), json=payload)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"OpenRouter embeddings failed: {resp.status_code} {resp.text[:500]}")
+    data = resp.json()
+    return (data.get("data") or [{}])[0].get("embedding") or []

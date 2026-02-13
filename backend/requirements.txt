@@ -3,7 +3,6 @@ uvicorn
 sqlalchemy
 httpx
 faiss-cpu
-openai
 groq
 gitpython
 tiktoken

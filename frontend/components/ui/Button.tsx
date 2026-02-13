@@ -15,14 +15,14 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props 
 }) => {
-  const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
+  const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transform";
   
   const variants = {
-    primary: "bg-primary text-white hover:bg-indigo-800 focus:ring-primary shadow-sm hover:shadow-md",
-    secondary: "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:ring-gray-200 shadow-sm",
-    outline: "border-2 border-primary text-primary hover:bg-indigo-50 focus:ring-primary bg-transparent",
-    ghost: "text-gray-600 hover:text-primary hover:bg-gray-100/80",
-    danger: "bg-error text-white hover:bg-red-600 focus:ring-error shadow-sm",
+    primary: "bg-primary text-white hover:bg-indigo-800 focus:ring-primary shadow-soft hover:shadow-float hover:-translate-y-0.5",
+    secondary: "bg-white/90 backdrop-blur-sm text-gray-700 border border-gray-200 hover:bg-white hover:text-gray-900 focus:ring-gray-200 shadow-card hover:shadow-soft",
+    outline: "border-2 border-primary text-primary hover:bg-primary/5 focus:ring-primary bg-white/50 backdrop-blur-sm shadow-card hover:shadow-soft",
+    ghost: "text-gray-600 hover:text-primary hover:bg-white/60 backdrop-blur-sm",
+    danger: "bg-error text-white hover:bg-red-600 focus:ring-error shadow-soft hover:shadow-float hover:-translate-y-0.5",
   };
 
   const sizes = {

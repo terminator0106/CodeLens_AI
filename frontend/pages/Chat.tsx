@@ -3,13 +3,16 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { useChatStore, useRepoStore } from '../store';
 import { api } from '../services/api';
 import { Send, Bot, User, Sparkles, Zap, AlignLeft, Code2, AlertTriangle } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 export const Chat: React.FC = () => {
-  const { messages, addMessage, isTyping, setTyping } = useChatStore();
+  const { messages, addMessage, setMessages, isTyping, setTyping, clearChat } = useChatStore();
   const { selectedRepo, repositories, setRepositories, selectRepo } = useRepoStore();
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const [repoLoading, setRepoLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -17,17 +20,63 @@ export const Chat: React.FC = () => {
 
   useEffect(() => {
     const loadRepos = async () => {
-      if (repositories.length) return;
       setRepoLoading(true);
       try {
-        const repos = await api.fetchRepos();
-        setRepositories(repos);
+        const repos = repositories.length ? repositories : await api.fetchRepos();
+        if (repositories.length === 0) {
+          setRepositories(repos);
+        }
+
+        // Check if repo is specified in URL
+        const urlParams = new URLSearchParams(location.search);
+        const repoId = urlParams.get('repo');
+
+        if (repoId) {
+          const targetRepo = repos.find(r => r.id === repoId);
+          if (targetRepo) {
+            selectRepo(targetRepo);
+            return;
+          }
+        }
+
+        // Auto-select repo if none selected
+        if (!selectedRepo && repos.length > 0) {
+          const indexedRepo = repos.find(r => r.status === 'indexed');
+          selectRepo(indexedRepo || repos[0]);
+        }
       } finally {
         setRepoLoading(false);
       }
     };
     loadRepos();
-  }, [selectedRepo, repositories, setRepositories, selectRepo]);
+  }, [location.search, repositories, selectedRepo, setRepositories, selectRepo]);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!selectedRepo?.id) {
+        clearChat();
+        return;
+      }
+      setHistoryLoading(true);
+      try {
+        const res = await api.fetchChatHistory(selectedRepo.id, 200);
+        setMessages(
+          (res.messages || []).map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.timestamp || Date.now()),
+          }))
+        );
+      } catch {
+        // If history fails, don't block chatting. Just start fresh.
+        clearChat();
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+    loadHistory();
+  }, [selectedRepo?.id, setMessages, clearChat]);
 
   const handleRepoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const repoId = e.target.value;
@@ -88,10 +137,14 @@ export const Chat: React.FC = () => {
               <Bot size={20} className="text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 font-display">Repo Assistant</h2>
-              <div className="flex items-center text-xs text-gray-500">
+              <h2 className="text-lg font-bold text-gray-900 font-display">AI Code Assistant</h2>
+              <div className="flex items-center text-sm text-gray-600">
                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
-                {selectedRepo ? `Active repo: ${selectedRepo.name}` : 'Select a repo to start'}
+                {selectedRepo ? (
+                  <span>Asking about: <strong className="text-primary">{selectedRepo.name}</strong></span>
+                ) : (
+                  <span className="text-amber-600">Select a repository to start</span>
+                )}
               </div>
             </div>
           </div>
@@ -119,6 +172,9 @@ export const Chat: React.FC = () => {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 scroll-smooth">
+          {historyLoading && messages.length === 0 && (
+            <div className="text-sm text-gray-500 px-2">Loading previous conversation…</div>
+          )}
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-2xl mx-auto">
               <div className="bg-white p-4 rounded-2xl shadow-sm mb-6 ring-1 ring-gray-100">
@@ -161,7 +217,8 @@ export const Chat: React.FC = () => {
                   }`}>
                   {msg.role === 'ai' ? (
                     <div className="space-y-2">
-                      {msg.content.split('\n').map((para, i) => {
+                      {msg.content.split('\n').map((paraRaw, i) => {
+                        const para = paraRaw.replace(/^\*\s+/, '• ');
                         // Parse basic markdown: **bold**, *italic*, `code`
                         const formatted = para
                           .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
