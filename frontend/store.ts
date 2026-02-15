@@ -85,6 +85,9 @@ interface UIState {
   toggleSidebar: () => void;
   isLoading: boolean;
   setLoading: (loading: boolean) => void;
+  authModalMode: 'login' | 'signup' | null;
+  openAuthModal: (mode: 'login' | 'signup') => void;
+  closeAuthModal: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -92,4 +95,7 @@ export const useUIStore = create<UIState>((set) => ({
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   isLoading: false,
   setLoading: (loading) => set({ isLoading: loading }),
+  authModalMode: null,
+  openAuthModal: (mode) => set({ authModalMode: mode }),
+  closeAuthModal: () => set({ authModalMode: null }),
 }));

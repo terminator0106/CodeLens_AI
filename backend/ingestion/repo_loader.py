@@ -561,19 +561,33 @@ def explain_file(
 
     system_prompt = (
         "You are CodeLens AI. Explain the given file using ONLY the provided code context. "
-        "Do not speculate. If the code context is insufficient, say so."
+        "Do not speculate. Keep the answer medium-length: concise but meaningfully informative. "
+        "If the code context is insufficient, say so briefly and only describe what is supported.\n\n"
+        "Output format (plain text):\n"
+        "- 6 to 9 bullet points (use '-' bullets).\n"
+        "- Each bullet must be one sentence.\n"
+        "- No preamble, no code blocks, no long walkthrough.\n"
+        "Coverage requirements (include what applies): purpose, key responsibilities, important inputs/outputs, "
+        "notable dependencies/integrations, and any important edge cases/assumptions visible in the code."
     )
     user_prompt = (
         f"File: {code_file.file_path}\nLanguage: {code_file.language}\n\n"
         f"Indexed code context (from this file only):\n{context}\n\n"
-        "Task: Explain what this file does, key responsibilities, and how it works."
+        "Task: Provide the minimal explanation in the required bullet format."
     )
 
     try:
-        explanation, _token_usage = generate_answer(system_prompt, user_prompt)
+        explanation, _token_usage = generate_answer(
+            system_prompt,
+            user_prompt,
+            max_tokens=512,
+            temperature=0.15,
+        )
     except HTTPException as exc:
         # Convert provider configuration errors into a safe message payload.
         return FileExplainResponse(message=str(exc.detail), referenced_chunks=[])
+
+    explanation = (explanation or "").strip()
     referenced = [int(c.chunk_index) for c in selected_chunks]
     return FileExplainResponse(explanation=explanation, referenced_chunks=referenced)
 

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
@@ -12,16 +12,33 @@ import { Products } from './pages/Products';
 import { Solutions } from './pages/Solutions';
 import { Pricing } from './pages/Pricing';
 import { Docs } from './pages/Docs';
-import { useAuthStore } from './store';
+import { useAuthStore, useUIStore } from './store';
 import { api } from './services/api';
+import { AuthModal } from './components/ui/AuthModal';
+import { ScrollToTop } from './components/layout/ScrollToTop';
 
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isAuthLoading = useAuthStore((state) => state.isAuthLoading);
+  const openAuthModal = useUIStore((state) => state.openAuthModal);
+  const [hasOpened, setHasOpened] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated && !hasOpened) {
+      openAuthModal('login');
+      setHasOpened(true);
+    }
+  }, [isAuthLoading, isAuthenticated, hasOpened, openAuthModal]);
+
   if (isAuthLoading) {
     return null;
   }
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
 };
 
 export default function App() {
@@ -42,8 +59,15 @@ export default function App() {
     loadMe();
   }, [setUser, setAuthLoading]);
 
+  // Ensure dark mode is always applied
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
   return (
     <Router>
+      <ScrollToTop />
+      <AuthModal />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />

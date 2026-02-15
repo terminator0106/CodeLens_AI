@@ -97,7 +97,13 @@ def _get_groq_client():
     return _groq_client
 
 
-def generate_answer(system_prompt: str, user_prompt: str) -> Tuple[str, int]:
+def generate_answer(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    max_tokens: int = 1024,
+    temperature: float = 0.2,
+) -> Tuple[str, int]:
     """Generate a natural-language answer from prompts.
 
     CORE PRODUCT PRINCIPLE: This module is the ONLY place we talk to an LLM.
@@ -116,9 +122,9 @@ def generate_answer(system_prompt: str, user_prompt: str) -> Tuple[str, int]:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.2,
+                temperature=temperature,
                 top_p=1,
-                max_tokens=1024,
+                max_tokens=max_tokens,
                 stream=False,
             )
         except TypeError:
@@ -129,9 +135,9 @@ def generate_answer(system_prompt: str, user_prompt: str) -> Tuple[str, int]:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.2,
+                temperature=temperature,
                 top_p=1,
-                max_completion_tokens=1024,
+                max_completion_tokens=max_tokens,
                 stream=False,
             )
 
@@ -146,9 +152,9 @@ def generate_answer(system_prompt: str, user_prompt: str) -> Tuple[str, int]:
         model=model,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        temperature=0.2,
+        temperature=temperature,
         top_p=1,
-        max_tokens=1024,
+        max_tokens=max_tokens,
     )
 
 

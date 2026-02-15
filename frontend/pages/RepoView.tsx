@@ -168,6 +168,7 @@ export const RepoView: React.FC = () => {
         if (!id || !selectedRepo) return;
         setReingesting(true);
         try {
+            api.clearExplainCache(id);
             await api.reingestRepo(id, selectedRepo.branch || 'main');
             alert('Re-ingestion started. This may take a few minutes.');
         } catch (error) {
@@ -182,6 +183,7 @@ export const RepoView: React.FC = () => {
         if (!id) return;
         setDeleting(true);
         try {
+            api.clearExplainCache(id);
             await api.deleteRepo(id);
             removeRepository(id);
             setIsSettingsOpen(false);
@@ -204,47 +206,47 @@ export const RepoView: React.FC = () => {
 
 
     return (
-        <div className="h-screen bg-white flex flex-col overflow-hidden font-sans text-gray-900">
+        <div className="h-screen bg-background flex flex-col overflow-hidden font-sans text-foreground">
             {/* Context Header */}
-            <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 flex-shrink-0 z-20 shadow-sm">
+            <header className="bg-card border-b border-border h-16 flex items-center justify-between px-6 flex-shrink-0 z-20 shadow-card">
                 <div className="flex items-center space-x-4">
-                    <Link to="/dashboard" className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-900 transition-colors">
+                    <Link to="/dashboard" className="p-2 hover:bg-secondary/40 rounded-lg text-muted-foreground hover:text-foreground transition-colors">
                         <ArrowLeft size={20} />
                     </Link>
                     <div className="flex flex-col">
                         <div className="flex items-center space-x-2">
-                            <span className="text-gray-900 font-bold text-sm">{selectedRepo?.name || 'Repository'}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-mono border border-gray-200">{selectedRepo?.branch || 'main'}</span>
+                            <span className="text-foreground font-bold text-sm">{selectedRepo?.name || 'Repository'}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-secondary/40 text-muted-foreground text-xs font-mono border border-border">{selectedRepo?.branch || 'main'}</span>
                         </div>
-                        <div className="flex items-center text-xs text-gray-500 mt-0.5">
+                        <div className="flex items-center text-xs text-muted-foreground mt-0.5">
                             <GitBranch size={10} className="mr-1" />
                             <span>{selectedRepo?.branch || 'main'}</span>
                             <span className="mx-1">•</span>
-                            <span className="text-green-600 font-medium">Indexed</span>
+                            <span className="text-accent font-medium">Indexed</span>
                         </div>
                     </div>
                 </div>
 
                 {/* View Toggle */}
-                <div className="bg-gray-100/80 p-1 rounded-lg flex space-x-1">
+                <div className="bg-secondary/30 p-1 rounded-lg flex space-x-1">
                     <button
                         disabled={!tabsEnabled}
                         onClick={() => tabsEnabled && setActiveTab('code')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${activeTab === 'code' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${!tabsEnabled ? 'opacity-50 cursor-not-allowed hover:text-gray-500' : ''}`}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${activeTab === 'code' ? 'bg-primary/20 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'} ${!tabsEnabled ? 'opacity-50 cursor-not-allowed hover:text-muted-foreground' : ''}`}
                     >
                         Code
                     </button>
                     <button
                         disabled={!tabsEnabled}
                         onClick={() => tabsEnabled && setActiveTab('explain')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${activeTab === 'explain' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${!tabsEnabled ? 'opacity-50 cursor-not-allowed hover:text-gray-500' : ''}`}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${activeTab === 'explain' ? 'bg-primary/20 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'} ${!tabsEnabled ? 'opacity-50 cursor-not-allowed hover:text-muted-foreground' : ''}`}
                     >
                         Explain
                     </button>
                     <button
                         disabled={!tabsEnabled}
                         onClick={() => tabsEnabled && setActiveTab('deps')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${activeTab === 'deps' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'} ${!tabsEnabled ? 'opacity-50 cursor-not-allowed hover:text-gray-500' : ''}`}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${activeTab === 'deps' ? 'bg-primary/20 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'} ${!tabsEnabled ? 'opacity-50 cursor-not-allowed hover:text-muted-foreground' : ''}`}
                     >
                         Graph
                     </button>
@@ -265,25 +267,25 @@ export const RepoView: React.FC = () => {
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Sidebar File Tree */}
-                <aside className="w-80 bg-gray-50 border-r border-gray-200 flex-shrink-0 flex flex-col">
-                    <div className="p-4 border-b border-gray-200/50">
+                <aside className="w-80 bg-secondary/20 border-r border-border flex-shrink-0 flex flex-col">
+                    <div className="p-4 border-b border-border">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                             <input
                                 type="text"
                                 placeholder="Search files..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                                className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary/20 outline-none"
                             />
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2">
                         {treeLoading && (
-                            <div className="text-sm text-gray-500 px-3 py-2">Loading files...</div>
+                            <div className="text-sm text-muted-foreground px-3 py-2">Loading files...</div>
                         )}
                         {treeError && (
-                            <div className="text-sm text-red-600 px-3 py-2">{treeError}</div>
+                            <div className="text-sm text-red-500 px-3 py-2">{treeError}</div>
                         )}
                         {!treeLoading && !treeError && filteredTree.map(node => (
                             <FileTree
@@ -297,7 +299,7 @@ export const RepoView: React.FC = () => {
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-hidden relative bg-white">
+                <main className="flex-1 overflow-hidden relative bg-background">
                     {activeTab === 'code' && (
                         <CodeViewer file={selectedFile} isLoading={fileLoading} error={fileError} />
                     )}
@@ -310,49 +312,49 @@ export const RepoView: React.FC = () => {
                                         <h1 className="font-display tracking-tight text-3xl flex items-center">
                                             <span className="bg-primary/10 p-3 rounded-xl mr-4 text-primary"><BookOpen size={28} /></span>
                                             <div>
-                                                <div className="text-2xl font-bold text-gray-900">{selectedFile.name}</div>
-                                                <div className="text-sm text-gray-500 font-normal mt-1">{selectedFile.filePath}</div>
+                                                <div className="text-2xl font-bold text-foreground">{selectedFile.name}</div>
+                                                <div className="text-sm text-muted-foreground font-normal mt-1">{selectedFile.filePath}</div>
                                             </div>
                                         </h1>
                                         {!!explanation && !explainMessage && !explainError && !explainLoading && (
-                                            <span className="text-xs font-semibold uppercase tracking-wide bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-full flex items-center">
+                                            <span className="text-xs font-semibold uppercase tracking-wide bg-accent/20 border border-accent text-accent px-3 py-1.5 rounded-full flex items-center">
                                                 <CheckCircle2 size={14} className="mr-1.5" />
                                                 AI Generated
                                             </span>
                                         )}
                                     </div>
-                                    <div className="bg-gradient-to-br from-indigo-50 via-purple-50/30 to-pink-50/20 p-8 rounded-2xl border border-indigo-100 shadow-lg relative overflow-hidden">
+                                    <div className="bg-primary/10 p-8 rounded-2xl border border-primary/20 shadow-lg relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-6 opacity-5"><MessageSquare size={150} /></div>
                                         <div className="relative z-10">
-                                            <h4 className="font-bold flex items-center gap-2 text-xl text-indigo-900 mb-4">
-                                                <Zap size={20} className="text-amber-500" />
+                                            <h4 className="font-bold flex items-center gap-2 text-xl text-foreground mb-4">
+                                                <Zap size={20} className="text-accent" />
                                                 AI Explanation
                                             </h4>
                                             {explainLoading && (
-                                                <div className="flex items-center space-x-3 text-indigo-800">
-                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                                                <div className="flex items-center space-x-3 text-foreground">
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
                                                     <p className="text-base">Analyzing code and generating explanation…</p>
                                                 </div>
                                             )}
                                             {explainError && (
-                                                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                                                    <p className="text-base text-red-700">{explainError}</p>
+                                                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                                                    <p className="text-base text-red-400">{explainError}</p>
                                                 </div>
                                             )}
                                             {!explainLoading && !explainError && explainMessage && (
-                                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                                                    <p className="text-base text-amber-900">{explainMessage}</p>
+                                                <div className="bg-accent/10 border border-accent/30 rounded-xl p-4">
+                                                    <p className="text-base text-foreground">{explainMessage}</p>
                                                 </div>
                                             )}
                                             {!explainLoading && !explainError && !explainMessage && explanation && (
-                                                <div className="prose prose-lg prose-indigo max-w-none">
-                                                    <div className="text-base leading-relaxed text-gray-800 space-y-4">
+                                                <div className="prose prose-lg prose-invert max-w-none">
+                                                    <div className="text-base leading-relaxed text-foreground space-y-4">
                                                         {explanation.split('\n').map((para, i) => {
                                                             // Parse basic markdown: **bold**, *italic*, `code`
                                                             const formatted = para
-                                                                .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+                                                                .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>')
                                                                 .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
-                                                                .replace(/`(.+?)`/g, '<code class="bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded text-sm font-mono">$1</code>');
+                                                                .replace(/`(.+?)`/g, '<code class="bg-primary/20 text-primary px-2 py-0.5 rounded text-sm font-mono">$1</code>');
                                                             return para.trim() ? (
                                                                 <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
                                                             ) : null;
@@ -361,18 +363,18 @@ export const RepoView: React.FC = () => {
                                                 </div>
                                             )}
                                             {!explainLoading && !explainError && !explainMessage && !explanation && (
-                                                <p className="text-base text-gray-600">No explanation available.</p>
+                                                <p className="text-base text-muted-foreground">No explanation available.</p>
                                             )}
                                         </div>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                    <div className="bg-gray-50 p-6 rounded-full mb-6">
-                                        <BookOpen size={48} className="text-gray-300" />
+                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                                    <div className="bg-secondary/40 p-6 rounded-full mb-6">
+                                        <BookOpen size={48} className="text-muted-foreground" />
                                     </div>
-                                    <p className="text-xl font-bold text-gray-900">No file selected</p>
-                                    <p className="text-gray-500 mt-2">Select a file from the explorer to view a grounded explanation.</p>
+                                    <p className="text-xl font-bold text-foreground">No file selected</p>
+                                    <p className="text-muted-foreground mt-2">Select a file from the explorer to view a grounded explanation.</p>
                                 </div>
                             )}
                         </div>
@@ -383,64 +385,64 @@ export const RepoView: React.FC = () => {
                             {tabsEnabled ? (
                                 <div>
                                     <div className="flex items-center justify-between mb-8">
-                                        <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                                        <h2 className="text-2xl font-bold text-foreground flex items-center">
                                             <span className="bg-primary/10 p-3 rounded-xl mr-3 text-primary"><Network size={24} /></span>
                                             File Analysis
                                         </h2>
-                                        <span className="text-xs font-semibold uppercase tracking-wide bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-full">
+                                        <span className="text-xs font-semibold uppercase tracking-wide bg-secondary/40 border border-border text-foreground px-3 py-1.5 rounded-full">
                                             Deterministic
                                         </span>
                                     </div>
 
                                     {metricsLoading && (
-                                        <div className="flex items-center space-x-3 text-gray-500">
+                                        <div className="flex items-center space-x-3 text-muted-foreground">
                                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
                                             <div className="text-sm">Loading analysis…</div>
                                         </div>
                                     )}
                                     {metricsError && (
-                                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">{metricsError}</div>
+                                        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-400">{metricsError}</div>
                                     )}
                                     {!metricsLoading && !metricsError && metrics && (
                                         <div className="space-y-8">
                                             {/* Key Metrics */}
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 {[
-                                                    { label: 'Total Lines', value: metrics.lines, icon: <FileCode size={20} />, color: 'blue' },
-                                                    { label: 'Code Chunks', value: metrics.chunks, icon: <Box size={20} />, color: 'purple' },
-                                                    { label: 'Avg Chunk Size', value: `${metrics.avg_chunk_size} tokens`, icon: <Layers size={20} />, color: 'amber' },
+                                                    { label: 'Total Lines', value: metrics.lines, icon: <FileCode size={20} />, color: 'primary' },
+                                                    { label: 'Code Chunks', value: metrics.chunks, icon: <Box size={20} />, color: 'primary' },
+                                                    { label: 'Avg Chunk Size', value: `${metrics.avg_chunk_size} tokens`, icon: <Layers size={20} />, color: 'primary' },
                                                 ].map((m) => (
-                                                    <div key={m.label} className={`bg-gradient-to-br from-${m.color}-50 to-white p-6 rounded-xl border border-${m.color}-100 shadow-sm hover:shadow-md transition-shadow`}>
+                                                    <div key={m.label} className={`bg-card p-6 rounded-xl border border-border shadow-float ai-card hover:shadow-glow transition-all`}>
                                                         <div className="flex items-center justify-between mb-3">
-                                                            <div className={`text-sm text-${m.color}-600 font-semibold uppercase tracking-wider`}>{m.label}</div>
-                                                            <div className={`text-${m.color}-500`}>{m.icon}</div>
+                                                            <div className={`text-sm text-muted-foreground font-semibold uppercase tracking-wider`}>{m.label}</div>
+                                                            <div className={`text-primary`}>{m.icon}</div>
                                                         </div>
-                                                        <div className="text-3xl font-bold text-gray-900 font-display">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</div>
+                                                        <div className="text-3xl font-bold text-foreground font-display">{typeof m.value === 'number' ? m.value.toLocaleString() : m.value}</div>
                                                     </div>
                                                 ))}
                                             </div>
 
                                             {/* File Structure Visualization */}
-                                            <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
-                                                <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                                            <div className="bg-card p-8 rounded-2xl border border-border shadow-float ai-card">
+                                                <h3 className="text-lg font-bold text-foreground mb-6 flex items-center">
                                                     <TrendingUp size={20} className="mr-2 text-primary" />
                                                     Code Complexity Flow
                                                 </h3>
                                                 <div className="space-y-4">
                                                     {/* Complexity bar */}
                                                     <div>
-                                                        <div className="flex justify-between text-sm text-gray-600 mb-2">
+                                                        <div className="flex justify-between text-sm text-muted-foreground mb-2">
                                                             <span className="font-medium">Lines of Code Distribution</span>
-                                                            <span className="text-gray-500">{metrics.lines} total lines</span>
+                                                            <span className="text-muted-foreground">{metrics.lines} total lines</span>
                                                         </div>
-                                                        <div className="h-12 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-xl relative overflow-hidden border border-gray-200">
+                                                        <div className="h-12 bg-secondary/30 rounded-xl relative overflow-hidden border border-border">
                                                             <div className="absolute inset-0 flex items-center px-4">
-                                                                <div className="h-8 bg-gradient-to-r from-green-500 to-amber-500 rounded-lg shadow-lg"
+                                                                <div className="h-8 bg-gradient-to-r from-accent/50 to-primary rounded-lg shadow-lg"
                                                                     style={{ width: `${Math.min(100, (metrics.chunks / (metrics.lines / 100)) * 10)}%` }}>
                                                                 </div>
                                                             </div>
                                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                                <span className="text-xs font-bold text-gray-700 drop-shadow">
+                                                                <span className="text-xs font-bold text-foreground drop-shadow">
                                                                     {metrics.chunks} chunks extracted
                                                                 </span>
                                                             </div>
@@ -449,37 +451,37 @@ export const RepoView: React.FC = () => {
 
                                                     {/* Token distribution */}
                                                     <div className="grid grid-cols-2 gap-4 mt-6">
-                                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                                            <div className="text-sm text-blue-600 font-medium mb-1">Indexing Coverage</div>
-                                                            <div className="text-2xl font-bold text-blue-900">{Math.round((metrics.chunks * metrics.avg_chunk_size) / Math.max(1, metrics.lines))}%</div>
-                                                            <div className="text-xs text-blue-600 mt-1">tokens per line ratio</div>
+                                                        <div className="bg-primary/10 p-4 rounded-xl border border-primary/20">
+                                                            <div className="text-sm text-primary font-medium mb-1">Indexing Coverage</div>
+                                                            <div className="text-2xl font-bold text-foreground">{Math.round((metrics.chunks * metrics.avg_chunk_size) / Math.max(1, metrics.lines))}%</div>
+                                                            <div className="text-xs text-muted-foreground mt-1">tokens per line ratio</div>
                                                         </div>
-                                                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                                                            <div className="text-sm text-purple-600 font-medium mb-1">Chunk Density</div>
-                                                            <div className="text-2xl font-bold text-purple-900">{(metrics.chunks / Math.max(1, metrics.lines / 100)).toFixed(2)}</div>
-                                                            <div className="text-xs text-purple-600 mt-1">chunks per 100 lines</div>
+                                                        <div className="bg-primary/10 p-4 rounded-xl border border-primary/20">
+                                                            <div className="text-sm text-primary font-medium mb-1">Chunk Density</div>
+                                                            <div className="text-2xl font-bold text-foreground">{(metrics.chunks / Math.max(1, metrics.lines / 100)).toFixed(2)}</div>
+                                                            <div className="text-xs text-muted-foreground mt-1">chunks per 100 lines</div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Insights */}
-                                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-100">
-                                                <h4 className="font-bold text-indigo-900 mb-3 flex items-center">
-                                                    <Zap size={18} className="mr-2 text-amber-500" />
+                                            <div className="bg-primary/10 p-6 rounded-xl border border-primary/20">
+                                                <h4 className="font-bold text-foreground mb-3 flex items-center">
+                                                    <Zap size={18} className="mr-2 text-accent" />
                                                     Analysis Insights
                                                 </h4>
-                                                <ul className="space-y-2 text-sm text-indigo-800">
+                                                <ul className="space-y-2 text-sm text-foreground">
                                                     <li className="flex items-start">
-                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-green-600 flex-shrink-0" />
+                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-accent flex-shrink-0" />
                                                         <span>This file contains <strong>{metrics.chunks}</strong> semantically meaningful code chunks for RAG retrieval.</span>
                                                     </li>
                                                     <li className="flex items-start">
-                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-green-600 flex-shrink-0" />
+                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-accent flex-shrink-0" />
                                                         <span>Average chunk size of <strong>{metrics.avg_chunk_size} tokens</strong> ensures optimal context window usage.</span>
                                                     </li>
                                                     <li className="flex items-start">
-                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-green-600 flex-shrink-0" />
+                                                        <CheckCircle2 size={16} className="mr-2 mt-0.5 text-accent flex-shrink-0" />
                                                         <span>Total <strong>{metrics.lines} lines</strong> analyzed and indexed for semantic search.</span>
                                                     </li>
                                                 </ul>
@@ -488,12 +490,12 @@ export const RepoView: React.FC = () => {
                                     )}
                                 </div>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                    <div className="bg-gray-50 p-6 rounded-full mb-6">
-                                        <Network size={48} className="text-gray-300" />
+                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                                    <div className="bg-secondary/40 p-6 rounded-full mb-6">
+                                        <Network size={48} className="text-muted-foreground" />
                                     </div>
-                                    <p className="text-xl font-bold text-gray-900">No file selected</p>
-                                    <p className="text-gray-500 mt-2">Select a file to view code analysis and metrics.</p>
+                                    <p className="text-xl font-bold text-foreground">No file selected</p>
+                                    <p className="text-muted-foreground mt-2">Select a file to view code analysis and metrics.</p>
                                 </div>
                             )}
                         </div>
@@ -538,23 +540,23 @@ export const RepoView: React.FC = () => {
             >
                 <div className="space-y-4">
                     {selectedRepo && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <h3 className="text-sm font-semibold text-gray-800 mb-2">Repository Metadata</h3>
-                            <p className="text-sm text-gray-700"><span className="font-medium">Name:</span> {selectedRepo.name}</p>
-                            <p className="text-sm text-gray-700 break-all"><span className="font-medium">URL:</span> {selectedRepo.url}</p>
-                            <p className="text-sm text-gray-700"><span className="font-medium">Branch:</span> {selectedRepo.branch}</p>
-                            <p className="text-sm text-gray-700"><span className="font-medium">Status:</span> {selectedRepo.status}</p>
+                        <div className="bg-secondary/30 border border-border rounded-lg p-4">
+                            <h3 className="text-sm font-semibold text-foreground mb-2">Repository Metadata</h3>
+                            <p className="text-sm text-foreground"><span className="font-medium">Name:</span> {selectedRepo.name}</p>
+                            <p className="text-sm text-foreground break-all"><span className="font-medium">URL:</span> {selectedRepo.url}</p>
+                            <p className="text-sm text-foreground"><span className="font-medium">Branch:</span> {selectedRepo.branch}</p>
+                            <p className="text-sm text-foreground"><span className="font-medium">Status:</span> {selectedRepo.status}</p>
                         </div>
                     )}
 
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                        <h3 className="text-sm font-semibold text-gray-800 mb-2">Ingestion Summary</h3>
-                        {settingsLoading && <p className="text-sm text-gray-500">Loading analytics…</p>}
+                    <div className="bg-card border border-border rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-foreground mb-2">Ingestion Summary</h3>
+                        {settingsLoading && <p className="text-sm text-muted-foreground">Loading analytics…</p>}
                         {settingsError && !settingsLoading && (
-                            <p className="text-sm text-red-600">{settingsError}</p>
+                            <p className="text-sm text-red-400">{settingsError}</p>
                         )}
                         {repoAnalytics && !settingsLoading && !settingsError && (
-                            <div className="space-y-1 text-sm text-gray-700">
+                            <div className="space-y-1 text-sm text-foreground">
                                 <p><span className="font-medium">Files:</span> {repoAnalytics.files}</p>
                                 <p><span className="font-medium">Chunks:</span> {repoAnalytics.chunks}</p>
                                 <p><span className="font-medium">Avg chunk size:</span> {repoAnalytics.avg_chunk_size} tokens</p>
@@ -562,13 +564,13 @@ export const RepoView: React.FC = () => {
                             </div>
                         )}
                         {!settingsLoading && !settingsError && !repoAnalytics && (
-                            <p className="text-sm text-gray-500">No ingestion analytics found for this repository yet.</p>
+                            <p className="text-sm text-muted-foreground">No ingestion analytics found for this repository yet.</p>
                         )}
                     </div>
 
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <h3 className="text-sm font-semibold text-red-800 mb-1">Danger Zone</h3>
-                        <p className="text-sm text-red-700">
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-red-400 mb-1">Danger Zone</h3>
+                        <p className="text-sm text-red-400/80">
                             Deleting this repository will permanently remove indexed files, code chunks, vector embeddings,
                             chat history, and analytics. This action cannot be undone.
                         </p>

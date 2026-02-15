@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { PieChart, BarChart2, TrendingUp, HardDrive, Download, Calendar, Info, Zap, Activity } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useRepoStore } from '../store';
+import { GridOverlay } from '../components/ui/grid-feature-cards';
 
 export const Analytics: React.FC = () => {
     const { repositories, setRepositories, selectedRepo, selectRepo } = useRepoStore();
@@ -98,10 +99,10 @@ export const Analytics: React.FC = () => {
     if (loading) return (
         <DashboardLayout>
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="bg-white/90 backdrop-blur-md p-8 rounded-xl border border-white/20 shadow-float">
+                <div className="bg-card/90 backdrop-blur-md p-8 rounded-xl border border-border shadow-float">
                     <div className="flex items-center space-x-3">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                        <span className="text-gray-700 font-medium">Loading analytics...</span>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span className="text-foreground font-medium">Loading analytics...</span>
                     </div>
                 </div>
             </div>
@@ -111,12 +112,12 @@ export const Analytics: React.FC = () => {
     if (!data) return (
         <DashboardLayout>
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="bg-white/90 backdrop-blur-md p-12 rounded-xl border border-white/20 shadow-float text-center">
-                    <div className="w-16 h-16 bg-gray-100/60 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-4">
-                        <BarChart2 size={24} className="text-gray-400" />
+                <div className="bg-card/90 backdrop-blur-md p-12 rounded-xl border border-border shadow-float text-center">
+                    <div className="w-16 h-16 bg-secondary/60 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-4">
+                        <BarChart2 size={24} className="text-muted-foreground" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No repositories found</h3>
-                    <p className="text-gray-600">Add a repository to view analytics and insights.</p>
+                    <h3 className="text-xl font-semibold text-foreground mb-2">No repositories found</h3>
+                    <p className="text-muted-foreground">Add a repository to view analytics and insights.</p>
                 </div>
             </div>
         </DashboardLayout>
@@ -129,17 +130,19 @@ export const Analytics: React.FC = () => {
         <DashboardLayout>
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 font-display tracking-tight animate-fade-in">Analytics & Insights</h1>
-                    <p className="text-gray-600 mt-2 text-lg animate-fade-in animation-delay-100">Deterministic observability for an indexed repository.</p>
+                    <h1 className="text-3xl font-bold text-foreground font-display tracking-tight animate-fade-in">Analytics & Insights</h1>
+                    <p className="text-muted-foreground mt-2 text-lg animate-fade-in animation-delay-100">Deterministic observability for an indexed repository.</p>
                 </div>
                 <div className="flex space-x-3 animate-fade-in animation-delay-200">
                     <select
                         value={selectedRepo?.id || ''}
                         onChange={onRepoChange}
-                        className="text-sm bg-white/90 backdrop-blur-md border border-white/20 rounded-lg px-4 py-2.5 text-gray-700 shadow-float hover:shadow-glow transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                        className="text-sm bg-black/60 backdrop-blur-md border border-border rounded-lg px-4 py-2.5 text-foreground shadow-float hover:shadow-chart transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
                     >
                         {repositories.map((r) => (
-                            <option key={r.id} value={r.id} className="bg-white text-gray-700">{r.name}</option>
+                            <option key={r.id} value={r.id} className="bg-black text-muted-foreground">
+                                {r.name}
+                            </option>
                         ))}
                     </select>
                     <Button
@@ -158,74 +161,64 @@ export const Analytics: React.FC = () => {
             {/* Key Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                 {[
-                    { label: 'Files', value: data.files, icon: <Activity className="text-blue-500" />, sub: 'Files indexed in this repo', trend: 'neutral', gradient: 'from-blue-50/80 to-blue-100/60' },
-                    { label: 'Chunks', value: data.chunks, icon: <BarChart2 className="text-purple-500" />, sub: 'Searchable chunks (DB + optional FAISS)', trend: 'neutral', gradient: 'from-purple-50/80 to-purple-100/60' },
-                    { label: 'Avg Chunk Size', value: `${data.avg_chunk_size} tokens`, icon: <TrendingUp className="text-green-500" />, sub: 'Mean chunk token count', trend: 'neutral', gradient: 'from-green-50/80 to-green-100/60' },
-                    { label: 'Ingestion Time', value: `${data.ingestion_time_ms} ms`, icon: <Zap className="text-amber-500" />, sub: 'Measured during latest ingestion', trend: 'neutral', gradient: 'from-amber-50/80 to-amber-100/60' },
+                    { label: 'Files', value: data.files, icon: <Activity className="text-primary" />, sub: 'Files indexed in this repo', trend: 'neutral' },
+                    { label: 'Chunks', value: data.chunks, icon: <BarChart2 className="text-primary" />, sub: 'Searchable chunks (DB + optional FAISS)', trend: 'neutral' },
+                    { label: 'Avg Chunk Size', value: `${data.avg_chunk_size} tokens`, icon: <TrendingUp className="text-primary" />, sub: 'Mean chunk token count', trend: 'neutral' },
+                    { label: 'Ingestion Time', value: `${data.ingestion_time_ms} ms`, icon: <Zap className="text-primary" />, sub: 'Measured during latest ingestion', trend: 'neutral' },
                 ].map((stat, i) => (
                     <div
                         key={i}
-                        className={`bg-gradient-to-br ${stat.gradient} backdrop-blur-md p-6 rounded-xl border border-white/20 shadow-float hover:shadow-glow transition-all duration-300 group hover:scale-105 animate-fade-in`}
+                        className={`relative overflow-hidden bg-black/40 backdrop-blur-sm p-6 rounded-xl border border-border shadow-float ai-card hover:shadow-glow transition-all duration-300 group hover:scale-105 animate-fade-in`}
                         style={{ animationDelay: `${i * 100 + 300}ms` }}
                     >
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-white/60 backdrop-blur-md rounded-xl group-hover:bg-white/80 transition-all duration-300 shadow-lift">
+                        <GridOverlay />
+                        <div className="relative z-10 flex justify-between items-start mb-4">
+                            <div className="p-3 bg-primary/20 rounded-xl group-hover:bg-primary/30 transition-all duration-300">
                                 {stat.icon}
                             </div>
                         </div>
-                        <p className="text-sm text-gray-600 font-semibold uppercase tracking-wider mb-1">{stat.label}</p>
-                        <h3 className="text-3xl font-bold text-gray-900 font-display mb-2">{stat.value}</h3>
-                        <p className="text-sm text-gray-500">{stat.sub}</p>
+                        <p className="relative z-10 text-sm text-muted-foreground font-semibold uppercase tracking-wider mb-1">{stat.label}</p>
+                        <h3 className="relative z-10 text-3xl font-bold text-foreground font-display mb-2">{stat.value}</h3>
+                        <p className="relative z-10 text-sm text-muted-foreground">{stat.sub}</p>
                     </div>
                 ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Chart */}
-                <div className="lg:col-span-2 bg-white/90 backdrop-blur-md p-8 rounded-xl border border-white/20 shadow-float hover:shadow-glow transition-all duration-500 animate-fade-in animation-delay-700">
-                    <div className="flex justify-between items-center mb-8">
+                <div className="lg:col-span-2 relative overflow-hidden bg-black/40 backdrop-blur-sm p-8 rounded-xl border border-border shadow-float ai-card hover:shadow-glow transition-all duration-500 animate-fade-in animation-delay-700">
+                    <GridOverlay />
+                    <div className="relative z-10 flex justify-between items-center mb-8">
                         <div>
-                            <h3 className="font-bold text-gray-900 text-xl mb-2">Language Distribution</h3>
-                            <p className="text-sm text-gray-600">Deterministic counts from indexed files.</p>
+                            <h3 className="font-bold text-foreground text-xl mb-2">Language Distribution</h3>
+                            <p className="text-sm text-muted-foreground">Deterministic counts from indexed files.</p>
                         </div>
-                        <div className="p-2 bg-gray-100/60 backdrop-blur-md rounded-lg hover:bg-gray-100/80 transition-all duration-300">
-                            <Info size={18} className="text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" />
+                        <div className="p-2 bg-secondary/40 rounded-lg hover:bg-secondary/60 transition-all duration-300">
+                            <Info size={18} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
                         </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="relative z-10 space-y-6">
                         {languageEntries.length === 0 && (
-                            <div className="text-sm text-gray-500 p-8 text-center bg-gray-50/60 backdrop-blur-md rounded-lg border border-gray-200/50">
+                            <div className="text-sm text-muted-foreground p-8 text-center bg-secondary/20 rounded-lg border border-border">
                                 No language data available.
                             </div>
                         )}
-                        {languageEntries.map(([lang, count], index) => {
+                        {languageEntries.map(([lang, count]) => {
                             const percentage = Math.max(2, Math.round((count / maxLang) * 100));
-                            const colors = [
-                                'from-blue-400 to-blue-600',
-                                'from-purple-400 to-purple-600',
-                                'from-green-400 to-green-600',
-                                'from-amber-400 to-amber-600',
-                                'from-rose-400 to-rose-600',
-                                'from-indigo-400 to-indigo-600',
-                                'from-cyan-400 to-cyan-600',
-                                'from-teal-400 to-teal-600'
-                            ];
-                            const gradientClass = colors[index % colors.length];
-
                             return (
                                 <div key={lang} className="group">
-                                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-3">
+                                    <div className="flex justify-between items-center text-sm font-medium text-foreground mb-3">
                                         <span className="font-mono text-base flex items-center">
-                                            <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${gradientClass} mr-3 shadow-sm`}></div>
+                                            <div className="w-3 h-3 rounded-full bg-muted-foreground mr-3 shadow-sm"></div>
                                             {lang}
                                         </span>
-                                        <span className="text-gray-600 font-semibold">{count} files</span>
+                                        <span className="text-muted-foreground font-semibold">{count} files</span>
                                     </div>
-                                    <div className="w-full bg-gray-100/60 backdrop-blur-md rounded-full h-3 overflow-hidden shadow-inner">
+                                    <div className="w-full bg-secondary rounded-full h-3 overflow-hidden shadow-inner">
                                         <div
-                                            className={`bg-gradient-to-r ${gradientClass} h-3 rounded-full transition-all duration-1000 ease-out shadow-sm group-hover:shadow-md`}
-                                            style={{ width: `${percentage}%` }}
+                                            className="bg-gradient-to-r from-primary to-accent h-3 rounded-full transition-all duration-1000 ease-out shadow-sm group-hover:shadow-md"
+                                            style={{ width: `${Math.max(8, percentage)}%` }}
                                         ></div>
                                     </div>
                                 </div>
@@ -236,44 +229,36 @@ export const Analytics: React.FC = () => {
 
                 {/* Secondary Stats */}
                 <div className="space-y-6">
-                    <div className="bg-white/90 backdrop-blur-md p-8 rounded-xl border border-white/20 shadow-float hover:shadow-glow transition-all duration-500 animate-fade-in animation-delay-800">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-gray-900 text-xl">Language Mix</h3>
-                            <div className="w-8 h-8 bg-purple-100/60 backdrop-blur-md rounded-lg flex items-center justify-center">
-                                <PieChart size={16} className="text-purple-500" />
+                    <div className="relative overflow-hidden bg-black/40 backdrop-blur-sm p-8 rounded-xl border border-border shadow-float ai-card hover:shadow-glow transition-all duration-500 animate-fade-in animation-delay-800">
+                        <GridOverlay />
+                        <div className="relative z-10 flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-foreground text-xl">Language Mix</h3>
+                            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                <PieChart size={16} className="text-primary" />
                             </div>
                         </div>
-                        <div className="space-y-5">
+                        <div className="relative z-10 space-y-5">
                             {languageEntries.length === 0 && (
-                                <div className="text-sm text-gray-500 p-4 text-center bg-gray-50/60 backdrop-blur-md rounded-lg border border-gray-200/50">
+                                <div className="text-sm text-muted-foreground p-4 text-center bg-secondary/20 rounded-lg border border-border">
                                     No language data available.
                                 </div>
                             )}
-                            {languageEntries.slice(0, 6).map(([lang, count], index) => {
+                            {languageEntries.slice(0, 6).map(([lang, count]) => {
                                 const pct = Math.round((count / Math.max(1, data.files)) * 100);
-                                const colors = [
-                                    'from-blue-400 to-blue-600',
-                                    'from-purple-400 to-purple-600',
-                                    'from-green-400 to-green-600',
-                                    'from-amber-400 to-amber-600',
-                                    'from-rose-400 to-rose-600',
-                                    'from-indigo-400 to-indigo-600'
-                                ];
-                                const gradientClass = colors[index % colors.length];
 
                                 return (
                                     <div key={lang} className="group">
-                                        <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                                        <div className="flex justify-between items-center text-sm font-medium text-foreground mb-2">
                                             <span className="font-mono flex items-center">
-                                                <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${gradientClass} mr-2`}></div>
+                                                <div className="w-2 h-2 rounded-full bg-muted-foreground mr-2"></div>
                                                 {lang}
                                             </span>
-                                            <span className="text-gray-600 font-semibold">{pct}%</span>
+                                            <span className="text-muted-foreground font-semibold">{pct}%</span>
                                         </div>
-                                        <div className="w-full bg-gray-100/60 backdrop-blur-md rounded-full h-2 overflow-hidden shadow-inner">
+                                        <div className="w-full bg-secondary rounded-full h-2 overflow-hidden shadow-inner">
                                             <div
-                                                className={`bg-gradient-to-r ${gradientClass} h-2 rounded-full transition-all duration-1000 ease-out`}
-                                                style={{ width: `${Math.max(2, pct)}%` }}
+                                                className="bg-gradient-to-r from-primary to-accent h-2 rounded-full transition-all duration-1000 ease-out"
+                                                style={{ width: `${Math.max(8, Math.max(2, pct))}%` }}
                                             ></div>
                                         </div>
                                     </div>
@@ -282,30 +267,31 @@ export const Analytics: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-white/90 backdrop-blur-md p-8 rounded-xl border border-white/20 shadow-float hover:shadow-glow transition-all duration-500 animate-fade-in animation-delay-900">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-gray-900 text-xl">Ingestion Details</h3>
-                            <div className="w-8 h-8 bg-green-100/60 backdrop-blur-md rounded-lg flex items-center justify-center">
-                                <HardDrive size={16} className="text-green-500" />
+                    <div className="relative overflow-hidden bg-black/40 backdrop-blur-sm p-8 rounded-xl border border-border shadow-float ai-card hover:shadow-glow transition-all duration-500 animate-fade-in animation-delay-900">
+                        <GridOverlay />
+                        <div className="relative z-10 flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-foreground text-xl">Ingestion Details</h3>
+                            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                <HardDrive size={16} className="text-primary" />
                             </div>
                         </div>
-                        <div className="space-y-4">
-                            <div className="p-4 bg-gradient-to-r from-blue-50/60 to-blue-100/40 backdrop-blur-md rounded-lg border border-blue-200/30">
+                        <div className="relative z-10 space-y-4">
+                            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-700 font-medium">Ingestion time</span>
-                                    <span className="font-mono font-semibold text-blue-600">{data.ingestion_time_ms} ms</span>
+                                    <span className="text-foreground font-medium">Ingestion time</span>
+                                    <span className="font-mono font-semibold text-primary">{data.ingestion_time_ms} ms</span>
                                 </div>
                             </div>
-                            <div className="p-4 bg-gradient-to-r from-purple-50/60 to-purple-100/40 backdrop-blur-md rounded-lg border border-purple-200/30">
+                            <div className="p-4 bg-accent/10 rounded-lg border border-accent/20">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-700 font-medium">Avg chunk size</span>
-                                    <span className="font-mono font-semibold text-purple-600">{data.avg_chunk_size} tokens</span>
+                                    <span className="text-foreground font-medium">Avg chunk size</span>
+                                    <span className="font-mono font-semibold text-accent">{data.avg_chunk_size} tokens</span>
                                 </div>
                             </div>
-                            <div className="p-4 bg-gradient-to-r from-green-50/60 to-green-100/40 backdrop-blur-md rounded-lg border border-green-200/30">
+                            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-700 font-medium">Total chunks</span>
-                                    <span className="font-mono font-semibold text-green-600">{data.chunks}</span>
+                                    <span className="text-foreground font-medium">Total chunks</span>
+                                    <span className="font-mono font-semibold text-primary">{data.chunks}</span>
                                 </div>
                             </div>
                         </div>

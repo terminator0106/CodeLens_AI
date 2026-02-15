@@ -1,7 +1,69 @@
 import { AnalyticsUsage, DashboardOverview, FileNode, Repository, User } from '../types';
-import { useAuthStore } from '../store';
+import { useAuthStore, useUIStore } from '../store';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const EXPLAIN_CACHE_PREFIX = 'codelens.explain.v1';
+const EXPLAIN_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
+
+type ExplainResponse = { explanation?: string; referenced_chunks: number[]; message?: string };
+
+const explainCacheKey = (repoId: string, fileId: number) => {
+    const userId = useAuthStore.getState().user?.id || 'anon';
+    return `${EXPLAIN_CACHE_PREFIX}:${userId}:${repoId}:${fileId}`;
+};
+
+const readExplainCache = (repoId: string, fileId: number): ExplainResponse | null => {
+    try {
+        const raw = localStorage.getItem(explainCacheKey(repoId, fileId));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as (ExplainResponse & { savedAt?: number });
+        const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : 0;
+        if (savedAt && Date.now() - savedAt > EXPLAIN_CACHE_TTL_MS) {
+            localStorage.removeItem(explainCacheKey(repoId, fileId));
+            return null;
+        }
+        return {
+            explanation: parsed.explanation,
+            referenced_chunks: Array.isArray(parsed.referenced_chunks) ? parsed.referenced_chunks : [],
+            message: parsed.message,
+        };
+    } catch {
+        return null;
+    }
+};
+
+const writeExplainCache = (repoId: string, fileId: number, value: ExplainResponse) => {
+    try {
+        localStorage.setItem(
+            explainCacheKey(repoId, fileId),
+            JSON.stringify({ ...value, savedAt: Date.now() })
+        );
+    } catch {
+        // Ignore storage quota / disabled storage.
+    }
+};
+
+const clearExplainCache = (opts?: { repoId?: string }) => {
+    try {
+        const userId = useAuthStore.getState().user?.id || 'anon';
+        const prefix = `${EXPLAIN_CACHE_PREFIX}:${userId}:`;
+        const repoNeedle = opts?.repoId ? `${prefix}${opts.repoId}:` : null;
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            if (repoNeedle) {
+                if (key.startsWith(repoNeedle)) toRemove.push(key);
+            } else {
+                if (key.startsWith(prefix)) toRemove.push(key);
+            }
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+        // Ignore
+    }
+};
 
 const isAuthRoute = (path: string) => path.startsWith('/auth/');
 const isOnAuthScreen = () => {
@@ -26,7 +88,11 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
             if (!isAuthRoute(path)) {
                 useAuthStore.getState().logout();
                 if (!isOnAuthScreen()) {
-                    window.location.hash = '#/login';
+                    try {
+                        useUIStore.getState().openAuthModal('login');
+                    } catch {
+                        window.location.hash = '#/login';
+                    }
                 }
             }
         }
@@ -137,7 +203,12 @@ export const api = {
         });
         return { user: { id: response.user.id.toString(), email: response.user.email } } as { user: User };
     },
-    logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
+    logout: async () => {
+        const res = await request<{ status: string }>('/auth/logout', { method: 'POST' });
+        // Clear any per-user cached AI outputs on logout.
+        clearExplainCache();
+        return res;
+    },
     fetchRepos: async (): Promise<Repository[]> => {
         const data = await request<
             { id: number; repo_url: string; repo_name: string; created_at: string; status: string; file_count: number }[]
@@ -204,14 +275,19 @@ export const api = {
         request<{ file_path: string; language?: string; content: string }>(
             `/repos/${repoId}/files/${fileId}`
         ),
-    explainFile: (repoId: string, fileId: number) =>
-        request<{ explanation?: string; referenced_chunks: number[]; message?: string }>(
-            `/repos/${repoId}/files/${fileId}/explain`,
-            {
-                method: 'POST',
-                body: JSON.stringify({}),
-            }
-        ),
+    explainFile: async (repoId: string, fileId: number): Promise<ExplainResponse> => {
+        const cached = readExplainCache(repoId, fileId);
+        if (cached) return cached;
+
+        const res = await request<ExplainResponse>(`/repos/${repoId}/files/${fileId}/explain`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+        writeExplainCache(repoId, fileId, res);
+        return res;
+    },
+
+    clearExplainCache: (repoId?: string) => clearExplainCache({ repoId }),
     fetchFileMetrics: (repoId: string, fileId: number) =>
         request<{ lines: number; chunks: number; avg_chunk_size: number }>(
             `/repos/${repoId}/files/${fileId}/metrics`
