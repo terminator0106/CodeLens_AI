@@ -1,31 +1,33 @@
 .text-type {
-  display: inline-block;
-  white-space: pre-wrap;
+    display: inline-block;
+    white-space: pre-wrap;
 }
 
 .text-type__content {
-  display: inline-block;
+    display: inline-block;
 }
 
 .text-type__cursor {
-  margin-left: 0.25rem;
-  display: inline-block;
-  opacity: 1;
-  animation-name: text-type-cursor-blink;
-  animation-timing-function: step-end;
-  animation-iteration-count: infinite;
+    margin-left: 0.25rem;
+    display: inline-block;
+    opacity: 1;
+    animation-name: text-type-cursor-blink;
+    animation-timing-function: step-end;
+    animation-iteration-count: infinite;
 }
 
 .text-type__cursor--hidden {
-  display: none;
+    display: none;
 }
 
 @keyframes text-type-cursor-blink {
-  from,
-  to {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0;
-  }
+
+    from,
+    to {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
 }
