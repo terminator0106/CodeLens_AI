@@ -49,7 +49,7 @@ npm run dev
 ```
 
 Frontend:
-- http://localhost:5173
+- http://localhost:3000
 
 ### Quick start (macOS / Linux)
 
@@ -92,7 +92,7 @@ Common knobs:
 - `RAG_TOP_K=4` — number of chunks to retrieve
 - `MAX_CONTEXT_TOKENS=1800` — token budget for chunk compression (`backend/rag/compressor.py`)
 - `CHUNK_SIZE_TOKENS=1000` / `CHUNK_OVERLAP_TOKENS=100` — ingestion chunking
-- `ALLOWED_ORIGINS=http://localhost:5173,...` — CORS
+- `ALLOWED_ORIGINS=http://localhost:3000,...` — CORS
 
 Embeddings / semantic retrieval (optional):
 - If `DISABLE_EMBEDDINGS=false`, embeddings require `OPENROUTER_API_KEY` and a FAISS index will be built/used.
@@ -162,7 +162,7 @@ RAG explained simply:
 
 ### 1) Start the app
 
-Run backend + frontend, then open http://localhost:5173.
+Run backend + frontend, then open http://localhost:3000.
 
 ### 2) Sign up / sign in
 

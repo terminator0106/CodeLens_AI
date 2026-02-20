@@ -246,7 +246,7 @@ export const api = {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch('/api/auth/profile-image', {
+        const response = await fetch(`${API_BASE}/auth/profile-image`, {
             method: 'POST',
             body: formData,
             credentials: 'include', // Important for cookie auth
@@ -254,7 +254,7 @@ export const api = {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
-            throw new Error(error.detail || 'Failed to upload image');
+            throw new Error(error.error || error.detail || 'Failed to upload image');
         }
 
         return await response.json();
