@@ -1,13 +1,188 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { useChatStore, useRepoStore } from '../store';
+import { useChatStore, useRepoStore, useUIStore } from '../store';
 import { api } from '../services/api';
-import { Send, Bot, User, Sparkles, Zap, AlignLeft, Code2, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Zap, AlignLeft, Code2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+
+type InlineToken =
+  | { kind: 'text'; value: string }
+  | { kind: 'bold'; value: string }
+  | { kind: 'italic'; value: string }
+  | { kind: 'code'; value: string };
+
+const splitInline = (input: string): InlineToken[] => {
+  const s = input || '';
+  const tokens: InlineToken[] = [];
+
+  const pattern = /\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(s)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push({ kind: 'text', value: s.slice(lastIndex, match.index) });
+    }
+
+    if (match[1] != null) tokens.push({ kind: 'bold', value: match[1] });
+    else if (match[2] != null) tokens.push({ kind: 'code', value: match[2] });
+    else if (match[3] != null) tokens.push({ kind: 'italic', value: match[3] });
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < s.length) {
+    tokens.push({ kind: 'text', value: s.slice(lastIndex) });
+  }
+
+  return tokens;
+};
+
+const renderIdentifierHighlights = (text: string): React.ReactNode[] => {
+  const s = text || '';
+
+  // Highlight likely code identifiers in normal text.
+  // - function calls: foo(), foo.bar(), foo_bar()
+  // - snake_case / camelCase / PascalCase tokens
+  const pattern = /(\b[A-Za-z_][\w.]*\(\)\b)|(\b[A-Za-z_]+(?:_[A-Za-z0-9_]+)+\b)|(\b[A-Z][a-zA-Z0-9]+\b)|(\b[a-z]+[A-Z][a-zA-Z0-9]*\b)/g;
+
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = pattern.exec(s)) !== null) {
+    if (match.index > last) {
+      out.push(<React.Fragment key={`t-${key++}`}>{s.slice(last, match.index)}</React.Fragment>);
+    }
+
+    const val = match[0];
+    const isFn = Boolean(match[1]);
+    const isSnake = Boolean(match[2]);
+    const isPascal = Boolean(match[3]);
+    const isCamel = Boolean(match[4]);
+
+    const cls = isFn
+      ? 'text-chart-blue font-semibold'
+      : isPascal
+        ? 'text-chart-purple font-semibold'
+        : isSnake || isCamel
+          ? 'text-chart-cyan font-semibold'
+          : 'text-foreground';
+
+    out.push(
+      <span key={`id-${key++}`} className={cls}>
+        {val}
+      </span>
+    );
+    last = pattern.lastIndex;
+  }
+
+  if (last < s.length) {
+    out.push(<React.Fragment key={`t-${key++}`}>{s.slice(last)}</React.Fragment>);
+  }
+
+  return out;
+};
+
+const CodeInline: React.FC<{ code: string }> = ({ code }) => {
+  // Lightweight inline token coloring.
+  const s = code || '';
+  const pattern = /(\basync\b|\bawait\b|\breturn\b|\bimport\b|\bfrom\b|\bclass\b|\bdef\b|\bfunction\b|\bconst\b|\blet\b|\bvar\b)|("[^"]*"|'[^']*')|(\b\d+\b)|(\b[A-Za-z_][\w.]*\(\))/g;
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = pattern.exec(s)) !== null) {
+    if (match.index > last) {
+      parts.push(<React.Fragment key={`c-${key++}`}>{s.slice(last, match.index)}</React.Fragment>);
+    }
+    const val = match[0];
+    const cls = match[1]
+      ? 'text-chart-purple'
+      : match[2]
+        ? 'text-chart-green'
+        : match[3]
+          ? 'text-orange-400'
+          : match[4]
+            ? 'text-chart-blue'
+            : 'text-foreground';
+    parts.push(
+      <span key={`c-${key++}`} className={cls}>
+        {val}
+      </span>
+    );
+    last = pattern.lastIndex;
+  }
+
+  if (last < s.length) {
+    parts.push(<React.Fragment key={`c-${key++}`}>{s.slice(last)}</React.Fragment>);
+  }
+
+  return (
+    <code className="bg-card text-foreground px-1.5 py-0.5 rounded text-sm font-mono border border-border/60">
+      {parts}
+    </code>
+  );
+};
+
+const getFileColor = (path: string): string => {
+  const ext = path.split('.').pop()?.toLowerCase() || '';
+  const colorMap: Record<string, string> = {
+    ts: 'text-blue-400',
+    tsx: 'text-blue-500',
+    js: 'text-yellow-400',
+    jsx: 'text-yellow-500',
+    py: 'text-blue-400',
+    json: 'text-green-400',
+    md: 'text-purple-400',
+    css: 'text-pink-400',
+    scss: 'text-pink-500',
+    html: 'text-orange-400',
+    yml: 'text-red-400',
+    yaml: 'text-red-400',
+    xml: 'text-orange-500',
+    svg: 'text-purple-500',
+    txt: 'text-gray-400',
+    env: 'text-yellow-500',
+  };
+  return colorMap[ext] || 'text-foreground';
+};
+
+const SourcesDropdown: React.FC<{ sources: string[] }> = ({ sources }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!sources || sources.length === 0) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border/50">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        <span className="font-medium">{sources.length} source file{sources.length > 1 ? 's' : ''}</span>
+      </button>
+      {isOpen && (
+        <ul className="mt-2 space-y-1 text-xs">
+          {sources.map((src, i) => (
+            <li key={i} className={`flex items-start font-mono ${getFileColor(src)}`}>
+              <span className="mr-1.5">•</span>
+              <span className="break-all">{src}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 export const Chat: React.FC = () => {
   const { messages, addMessage, setMessages, isTyping, setTyping, clearChat } = useChatStore();
   const { selectedRepo, repositories, setRepositories, selectRepo } = useRepoStore();
+  const explainLevel = useUIStore((s) => s.explainLevel);
+  const setExplainLevel = useUIStore((s) => s.setExplainLevel);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const [repoLoading, setRepoLoading] = useState(false);
@@ -82,6 +257,7 @@ export const Chat: React.FC = () => {
             role: m.role,
             content: m.content,
             timestamp: new Date(m.timestamp || Date.now()),
+            sources: m.sources || [],
           }))
         );
       } catch {
@@ -114,15 +290,13 @@ export const Chat: React.FC = () => {
       if (!selectedRepo) {
         throw new Error('Select a repository context before chatting.');
       }
-      const response = await api.queryChat(selectedRepo.id, text);
+      const response = await api.queryChat(selectedRepo.id, text, { level: explainLevel });
       addMessage({
         id: (Date.now() + 1).toString(),
         role: 'ai',
-        content:
-          response.referenced_files?.length
-            ? `${response.answer}\n\nSources:\n${response.referenced_files.map((p) => `• ${p}`).join('\n')}`
-            : response.answer,
+        content: response.answer,
         timestamp: new Date(),
+        sources: response.referenced_files || [],
       });
     } catch (error) {
       addMessage({
@@ -183,6 +357,19 @@ export const Chat: React.FC = () => {
                 </option>
               ))}
             </select>
+
+            <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded border border-border">
+              level
+            </span>
+            <select
+              value={explainLevel}
+              onChange={(e) => setExplainLevel(e.target.value as any)}
+              className="text-xs bg-card border border-border rounded-lg px-3 py-2 text-foreground"
+            >
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="expert">Expert</option>
+            </select>
           </div>
         </div>
 
@@ -232,20 +419,40 @@ export const Chat: React.FC = () => {
                   : 'bg-secondary text-foreground rounded-bl-none border border-border'
                   }`}>
                   {msg.role === 'ai' ? (
-                    <div className="space-y-2">
-                      {msg.content.split('\n').map((paraRaw, i) => {
-                        const para = paraRaw.replace(/^\*\s+/, '• ');
-                        // Parse basic markdown: **bold**, *italic*, `code`
-                        const formatted = para
-                          .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
-                          .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
-                          .replace(/`(.+?)`/g, '<code class="bg-card text-foreground px-1.5 py-0.5 rounded text-sm font-mono">$1</code>');
-                        return para.trim() ? (
-                          <div key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
-                        ) : (
-                          <div key={i} className="h-2" />
-                        );
-                      })}
+                    <div>
+                      <div className="space-y-2">
+                        {msg.content.split('\n').map((paraRaw, i) => {
+                          const para = paraRaw.replace(/^\*\s+/, '• ');
+                          if (!para.trim()) return <div key={i} className="h-2" />;
+
+                          const inline = splitInline(para);
+                          return (
+                            <div key={i} className="leading-relaxed">
+                              {inline.map((t, idx) => {
+                                if (t.kind === 'bold') {
+                                  return (
+                                    <strong key={idx} className="font-semibold text-foreground">
+                                      {renderIdentifierHighlights(t.value)}
+                                    </strong>
+                                  );
+                                }
+                                if (t.kind === 'italic') {
+                                  return (
+                                    <em key={idx} className="italic">
+                                      {renderIdentifierHighlights(t.value)}
+                                    </em>
+                                  );
+                                }
+                                if (t.kind === 'code') {
+                                  return <CodeInline key={idx} code={t.value} />;
+                                }
+                                return <React.Fragment key={idx}>{renderIdentifierHighlights(t.value)}</React.Fragment>;
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {msg.sources && msg.sources.length > 0 && <SourcesDropdown sources={msg.sources} />}
                     </div>
                   ) : (
                     msg.content

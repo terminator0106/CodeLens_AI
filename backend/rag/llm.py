@@ -110,52 +110,38 @@ def generate_answer(
     All analytics/metrics must remain deterministic elsewhere.
     """
 
-    provider = (settings.llm_provider or "").strip().lower()
+    # Groq-only: we intentionally do not fall back to OpenRouter/OpenAI.
+    client = _get_groq_client()
+    try:
+        response = client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=temperature,
+            top_p=1,
+            max_tokens=max_tokens,
+            stream=False,
+        )
+    except TypeError:
+        # Some Groq SDK versions use `max_completion_tokens`.
+        response = client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=temperature,
+            top_p=1,
+            max_completion_tokens=max_tokens,
+            stream=False,
+        )
 
-    # Default to Groq if configured; fallback to OpenRouter if that is configured.
-    if provider == "groq" or (provider == "" and os.getenv("GROQ_API_KEY")):
-        client = _get_groq_client()
-        try:
-            response = client.chat.completions.create(
-                model=settings.groq_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=temperature,
-                top_p=1,
-                max_tokens=max_tokens,
-                stream=False,
-            )
-        except TypeError:
-            # Some Groq SDK versions use `max_completion_tokens`.
-            response = client.chat.completions.create(
-                model=settings.groq_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=temperature,
-                top_p=1,
-                max_completion_tokens=max_tokens,
-                stream=False,
-            )
-
-        answer = getattr(response.choices[0].message, "content", "") or ""
-        usage = getattr(response, "usage", None)
-        token_usage = int(getattr(usage, "total_tokens", 0) or 0)
-        return answer, token_usage
-
-    # OpenRouter provider
-    model = (settings.chat_model or "").strip() or "openai/gpt-4o-mini"
-    return _openrouter_chat_completion(
-        model=model,
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        temperature=temperature,
-        top_p=1,
-        max_tokens=max_tokens,
-    )
+    answer = getattr(response.choices[0].message, "content", "") or ""
+    usage = getattr(response, "usage", None)
+    token_usage = int(getattr(usage, "total_tokens", 0) or 0)
+    return answer, token_usage
 
 
 def refine_answer_with_openrouter(
@@ -204,3 +190,56 @@ def refine_answer_with_openrouter(
         top_p=1,
         max_tokens=512,
     )
+
+
+def blend_general_and_rag_with_groq(
+    *,
+    question: str,
+    general_draft: str,
+    rag_draft: str,
+    referenced_files: list[str],
+) -> Tuple[str, int]:
+    """Blend a general-knowledge draft with a repo-grounded draft using Groq only."""
+
+    def _clip_chars(s: str, limit: int) -> str:
+        s = (s or "").strip()
+        if not s:
+            return ""
+        if len(s) <= limit:
+            return s
+        return s[:limit].rstrip() + "\n…"
+
+    # Prevent large drafts from triggering Groq request-size rejections.
+    general = _clip_chars(general_draft, 6_000)
+    rag = _clip_chars(rag_draft, 6_000)
+    files_hint = "\n".join(f"- {p}" for p in (referenced_files or [])[:40])
+
+    if not general and not rag:
+        return ("", 0)
+    if general and not rag:
+        return (general, 0)
+    if rag and not general:
+        return (rag, 0)
+
+    system_prompt = (
+        "You are a senior software assistant. You will blend two drafts into one helpful answer.\n\n"
+        "Draft A is general software knowledge (may not be repo-specific).\n"
+        "Draft B is grounded in retrieved repository context.\n\n"
+        "Rules:\n"
+        "- Final answer must feel complete and helpful.\n"
+        "- Keep roughly 60% of the content from Draft A and ~40% from Draft B.\n"
+        "- Never invent repo-specific facts; only use repo-specific details that appear in Draft B.\n"
+        "- When adding best practices, phrase them as general guidance.\n"
+        "- Keep formatting readable (short paragraphs / bullets) and avoid markdown that relies on asterisks.\n"
+        "- Do not mention these rules or any percentages."
+    )
+
+    user_prompt = (
+        f"Question:\n{question}\n\n"
+        f"Referenced files (from retrieval):\n{files_hint or '- (none)'}\n\n"
+        f"General draft (A):\n{general}\n\n"
+        f"Repo-grounded draft (B):\n{rag}\n\n"
+        "Return the blended final answer only."
+    )
+
+    return generate_answer(system_prompt, user_prompt, max_tokens=850, temperature=0.2)

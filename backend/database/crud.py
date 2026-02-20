@@ -9,18 +9,32 @@ from sqlalchemy.orm import Session
 from .models import ChatMessage, CodeChunk, CodeFile, Repository, User
 
 
-def normalize_question(question: str) -> str:
-    """Normalize question text for stable cache keys."""
+def normalize_question(question: str, *, explain_level: str | None = None) -> str:
+    """Normalize question text for stable cache keys.
+
+    Include explain_level so different verbosity targets do not collide.
+    """
+
+    lvl = (explain_level or "").strip().lower()
+    if lvl not in {"beginner", "intermediate", "expert"}:
+        lvl = "intermediate"
 
     q = (question or "").strip().lower()
     q = re.sub(r"\s+", " ", q)
-    return q
+    return f"lvl={lvl}|{q}"
 
 
-def get_cached_chat_message(db: Session, user_id: int, repo_id: int, question: str) -> Optional[ChatMessage]:
+def get_cached_chat_message(
+    db: Session,
+    user_id: int,
+    repo_id: int,
+    question: str,
+    *,
+    explain_level: str | None = None,
+) -> Optional[ChatMessage]:
     """Return the most recent cached answer for an identical normalized question."""
 
-    qn = normalize_question(question)
+    qn = normalize_question(question, explain_level=explain_level)
     return (
         db.query(ChatMessage)
         .filter(
@@ -39,6 +53,7 @@ def create_chat_message(
     user_id: int,
     repo_id: int,
     question: str,
+    explain_level: str | None,
     answer: str,
     referenced_files: List[str],
     token_usage: int,
@@ -50,7 +65,7 @@ def create_chat_message(
         user_id=user_id,
         repo_id=repo_id,
         question=question,
-        question_normalized=normalize_question(question),
+        question_normalized=normalize_question(question, explain_level=explain_level),
         answer=answer,
         referenced_files_json=json.dumps(sorted(set(referenced_files or []))),
         token_usage=int(token_usage or 0),
@@ -92,9 +107,9 @@ def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
     return db.query(User).filter(User.id == user_id).first()
 
 
-def create_user(db: Session, email: str, hashed_password: str) -> User:
+def create_user(db: Session, email: str, hashed_password: str, username: Optional[str] = None) -> User:
     """Create and persist a new user."""
-    user = User(email=email, hashed_password=hashed_password)
+    user = User(email=email, hashed_password=hashed_password, username=username)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -189,7 +204,12 @@ def create_code_chunk(
 
 def list_files_by_repo(db: Session, repo_id: int) -> List[CodeFile]:
     """List code files for a repository."""
-    return db.query(CodeFile).filter(CodeFile.repo_id == repo_id).all()
+    return (
+        db.query(CodeFile)
+        .filter(CodeFile.repo_id == repo_id)
+        .order_by(CodeFile.id.asc())
+        .all()
+    )
 
 
 def get_file_by_id(db: Session, repo_id: int, file_id: int) -> Optional[CodeFile]:
@@ -199,6 +219,23 @@ def get_file_by_id(db: Session, repo_id: int, file_id: int) -> Optional[CodeFile
         .filter(CodeFile.repo_id == repo_id, CodeFile.id == file_id)
         .first()
     )
+
+
+def get_files_by_paths(db: Session, repo_id: int, file_paths: List[str]) -> List[CodeFile]:
+    """Fetch code files by file_path list within a repository."""
+
+    paths = [p for p in (file_paths or []) if (p or "").strip()]
+    if not paths:
+        return []
+
+    # Keep deterministic ordering: return rows in file id order.
+    rows = (
+        db.query(CodeFile)
+        .filter(CodeFile.repo_id == repo_id, CodeFile.file_path.in_(paths))
+        .order_by(CodeFile.id.asc())
+        .all()
+    )
+    return list(rows or [])
 
 
 def list_chunks_by_file(db: Session, file_id: int) -> List[CodeChunk]:

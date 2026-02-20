@@ -28,7 +28,6 @@ export const Solutions: React.FC = () => {
                         <div className="hidden md:flex items-center space-x-10">
                             <Link to="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Products</Link>
                             <Link to="/solutions" className="text-sm font-medium text-primary border-b-2 border-primary">Solutions</Link>
-                            <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
                             <Link to="/docs" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -298,26 +297,24 @@ export const Solutions: React.FC = () => {
                 </div>
             </section>
 
-            <section className="py-20 bg-primary">
+            <section className="py-20 bg-secondary/30 border-t border-border">
                 <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+                    <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
                         Ready to see CodeLens on your team?
                     </h2>
-                    <p className="text-xl text-indigo-100 mb-8">
+                    <p className="text-xl text-muted-foreground mb-8">
                         Start with our free plan and invite your teammates in minutes.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                         {isAuthenticated ? (
                             <Link to="/dashboard">
-                                <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-gray-50">
+                                <Button size="lg">
                                     Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
                                 </Button>
                             </Link>
                         ) : (
                             <Button
                                 size="lg"
-                                variant="secondary"
-                                className="bg-white text-primary hover:bg-gray-50"
                                 onClick={() => openAuthModal('signup')}
                             >
                                 Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
@@ -328,23 +325,23 @@ export const Solutions: React.FC = () => {
             </section>
 
             {/* CTA Section */}
-            <section className="py-20 bg-primary">
+            <section className="py-20 bg-secondary/30 border-t border-border">
                 <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+                    <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
                         Ready to Revolutionize Your Development Process?
                     </h2>
-                    <p className="text-xl text-indigo-100 mb-8">
+                    <p className="text-xl text-muted-foreground mb-8">
                         Join thousands of developers who have transformed how they understand and work with code.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                         <Link to={isAuthenticated ? "/dashboard" : "/signup"}>
-                            <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-gray-50">
+                            <Button size="lg">
                                 {isAuthenticated ? 'Go to Dashboard' : 'Start Free Trial'} <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
-                        <Link to="/pricing">
-                            <Button size="lg" variant="ghost" className="text-white border-white hover:bg-white/10">
-                                View Pricing
+                        <Link to="/products">
+                            <Button size="lg" variant="secondary">
+                                Explore Features
                             </Button>
                         </Link>
                     </div>

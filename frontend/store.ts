@@ -88,6 +88,9 @@ interface UIState {
   authModalMode: 'login' | 'signup' | null;
   openAuthModal: (mode: 'login' | 'signup') => void;
   closeAuthModal: () => void;
+
+  explainLevel: 'beginner' | 'intermediate' | 'expert';
+  setExplainLevel: (level: 'beginner' | 'intermediate' | 'expert') => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -98,4 +101,23 @@ export const useUIStore = create<UIState>((set) => ({
   authModalMode: null,
   openAuthModal: (mode) => set({ authModalMode: mode }),
   closeAuthModal: () => set({ authModalMode: null }),
+
+  explainLevel: (() => {
+    try {
+      const raw = sessionStorage.getItem('codelens.explainLevel') || '';
+      const v = raw.toLowerCase().trim();
+      if (v === 'beginner' || v === 'intermediate' || v === 'expert') return v;
+    } catch {
+      // ignore
+    }
+    return 'intermediate';
+  })(),
+  setExplainLevel: (level) => {
+    try {
+      sessionStorage.setItem('codelens.explainLevel', level);
+    } catch {
+      // ignore
+    }
+    set({ explainLevel: level });
+  },
 }));

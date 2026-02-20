@@ -27,7 +27,6 @@ export const Docs: React.FC = () => {
                         <div className="hidden md:flex items-center space-x-10">
                             <Link to="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Products</Link>
                             <Link to="/solutions" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Solutions</Link>
-                            <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
                             <Link to="/docs" className="text-sm font-medium text-primary border-b-2 border-primary">Docs</Link>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -424,22 +423,22 @@ export const Docs: React.FC = () => {
             </section>
 
             {/* CTA Section */}
-            <section className="py-20 bg-primary">
+            <section className="py-20 bg-secondary/30 border-t border-border">
                 <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+                    <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
                         Ready to Experience AI-Powered Code Intelligence?
                     </h2>
-                    <p className="text-xl text-indigo-100 mb-8">
+                    <p className="text-xl text-muted-foreground mb-8">
                         Start your free trial and see how CodeLens transforms your development workflow.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                         <Link to={isAuthenticated ? "/dashboard" : "/signup"}>
-                            <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-gray-50">
+                            <Button size="lg">
                                 {isAuthenticated ? 'Go to Dashboard' : 'Start Free Trial'} <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
                         <Link to="/products">
-                            <Button size="lg" variant="ghost" className="text-white border-white hover:bg-white/10">
+                            <Button size="lg" variant="secondary">
                                 Explore Features
                             </Button>
                         </Link>

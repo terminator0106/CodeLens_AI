@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { useAuthStore, useUIStore, useRepoStore } from '../../store';
-import { Bell, UserCircle, Search } from 'lucide-react';
+import { Bell, UserCircle, Search, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../../services/api';
 
 export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const isSidebarOpen = useUIStore((state) => state.isSidebarOpen);
   const { repositories, setFilteredRepositories } = useRepoStore();
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +26,16 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       repo.description?.toLowerCase().includes(query.toLowerCase())
     );
     setFilteredRepositories(filtered);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Failed to logout from server:', error);
+    }
+    logout();
+    navigate('/');
   };
 
   return (
@@ -48,16 +60,28 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
               />
             </div>
           </div>
-          <div className="flex items-center space-x-4 ml-4">
+          <div className="flex items-center space-x-3 ml-4">
             <button className="text-muted-foreground hover:text-foreground transition-all relative p-2 rounded-lg hover:bg-accent">
               <Bell size={22} />
               <span className="absolute top-1.5 right-1.5 block h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-card shadow-sm"></span>
             </button>
+
+            {/* Sign Out Button */}
+            <button
+              onClick={handleLogout}
+              className="text-muted-foreground hover:text-destructive transition-all p-2 rounded-lg hover:bg-destructive/10"
+              title="Sign out"
+            >
+              <LogOut size={20} />
+            </button>
+
             <div className="h-8 w-px bg-gradient-to-b from-transparent via-border to-transparent"></div>
             <Link to="/settings" className="flex items-center space-x-3 group p-2 rounded-xl hover:bg-accent backdrop-blur-sm transition-all">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{user?.email}</p>
-                <p className="text-xs text-muted-foreground font-medium">Pro Plan</p>
+                <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                  {user?.username || user?.email?.split('@')?.[0] || 'User'}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">{user?.email}</p>
               </div>
               {user?.profile_image_url ? (
                 <img

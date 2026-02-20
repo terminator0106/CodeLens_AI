@@ -47,7 +47,7 @@ export const AuthModal: React.FC = () => {
         setLoading(true);
         try {
             if (isSignup) {
-                const response = await api.signup(email, password);
+                const response = await api.signup(fullName, email, password);
                 loginStore(response.user);
             } else {
                 const response = await api.login(email, password, rememberMe);
@@ -71,11 +71,11 @@ export const AuthModal: React.FC = () => {
             <form className="space-y-6" onSubmit={handleSubmit}>
                 {isSignup && (
                     <Input
-                        label="Full Name"
+                        label="Username"
                         type="text"
                         required
                         icon={<User size={18} />}
-                        placeholder="Jane Doe"
+                        placeholder="janedoe"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                     />

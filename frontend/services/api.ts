@@ -1,62 +1,131 @@
-import { AnalyticsUsage, DashboardOverview, FileNode, Repository, User } from '../types';
+import { AnalyticsUsage, DashboardOverview, ExplainLevel, FileNode, Repository, User } from '../types';
 import { useAuthStore, useUIStore } from '../store';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-const EXPLAIN_CACHE_PREFIX = 'codelens.explain.v1';
+const EXPLAIN_CACHE_PREFIX_V1 = 'codelens.explain.v1';
+const EXPLAIN_CACHE_PREFIX_V2 = 'codelens.explain.v2';
+const WHY_CACHE_PREFIX = 'codelens.why.v1';
 const EXPLAIN_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 type ExplainResponse = { explanation?: string; referenced_chunks: number[]; message?: string };
 
-const explainCacheKey = (repoId: string, fileId: number) => {
-    const userId = useAuthStore.getState().user?.id || 'anon';
-    return `${EXPLAIN_CACHE_PREFIX}:${userId}:${repoId}:${fileId}`;
+const normalizeLevel = (level?: string): ExplainLevel => {
+    const raw = (level || '').toLowerCase().trim();
+    if (raw === 'beginner' || raw === 'intermediate' || raw === 'expert') return raw;
+    return 'intermediate';
 };
 
-const readExplainCache = (repoId: string, fileId: number): ExplainResponse | null => {
+const safeKeyPart = (value: string) =>
+    (value || '')
+        .toString()
+        .replace(/\s+/g, ' ')
+        .slice(0, 120)
+        .replace(/[^a-zA-Z0-9._:-]/g, '_');
+
+const explainCacheKeyV1 = (repoId: string, fileId: number) => {
+    const userId = useAuthStore.getState().user?.id || 'anon';
+    return `${EXPLAIN_CACHE_PREFIX_V1}:${userId}:${repoId}:${fileId}`;
+};
+
+const explainCacheKeyV2 = (repoId: string, fileId: number, scope: string, level: ExplainLevel) => {
+    const userId = useAuthStore.getState().user?.id || 'anon';
+    return `${EXPLAIN_CACHE_PREFIX_V2}:${userId}:${repoId}:${fileId}:${safeKeyPart(scope)}:${level}`;
+};
+
+const whyCacheKey = (repoId: string, fileId: number, scope: string, level: ExplainLevel) => {
+    const userId = useAuthStore.getState().user?.id || 'anon';
+    return `${WHY_CACHE_PREFIX}:${userId}:${repoId}:${fileId}:${safeKeyPart(scope)}:${level}`;
+};
+
+const readCache = (key: string): (ExplainResponse & { savedAt?: number }) | null => {
     try {
-        const raw = localStorage.getItem(explainCacheKey(repoId, fileId));
+        const raw = localStorage.getItem(key);
         if (!raw) return null;
         const parsed = JSON.parse(raw) as (ExplainResponse & { savedAt?: number });
         const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : 0;
         if (savedAt && Date.now() - savedAt > EXPLAIN_CACHE_TTL_MS) {
-            localStorage.removeItem(explainCacheKey(repoId, fileId));
+            localStorage.removeItem(key);
             return null;
         }
-        return {
-            explanation: parsed.explanation,
-            referenced_chunks: Array.isArray(parsed.referenced_chunks) ? parsed.referenced_chunks : [],
-            message: parsed.message,
-        };
+        return parsed;
     } catch {
         return null;
     }
 };
 
-const writeExplainCache = (repoId: string, fileId: number, value: ExplainResponse) => {
+const readExplainCache = (repoId: string, fileId: number, scope: string, level?: ExplainLevel): ExplainResponse | null => {
+    const lvl = normalizeLevel(level);
+    const v2 = readCache(explainCacheKeyV2(repoId, fileId, scope, lvl));
+    if (v2) {
+        return {
+            explanation: v2.explanation,
+            referenced_chunks: Array.isArray(v2.referenced_chunks) ? v2.referenced_chunks : [],
+            message: v2.message,
+        };
+    }
+
+    // Back-compat: old cache only existed for file-level explain.
+    if (scope === 'file' && lvl === 'intermediate') {
+        const v1 = readCache(explainCacheKeyV1(repoId, fileId));
+        if (v1) {
+            return {
+                explanation: v1.explanation,
+                referenced_chunks: Array.isArray(v1.referenced_chunks) ? v1.referenced_chunks : [],
+                message: v1.message,
+            };
+        }
+    }
+    return null;
+};
+
+const writeCache = (key: string, value: ExplainResponse) => {
     try {
-        localStorage.setItem(
-            explainCacheKey(repoId, fileId),
-            JSON.stringify({ ...value, savedAt: Date.now() })
-        );
+        localStorage.setItem(key, JSON.stringify({ ...value, savedAt: Date.now() }));
     } catch {
         // Ignore storage quota / disabled storage.
     }
 };
 
+const writeExplainCache = (repoId: string, fileId: number, scope: string, level: ExplainLevel, value: ExplainResponse) => {
+    writeCache(explainCacheKeyV2(repoId, fileId, scope, level), value);
+};
+
+const readWhyCache = (repoId: string, fileId: number, scope: string, level?: ExplainLevel): ExplainResponse | null => {
+    const lvl = normalizeLevel(level);
+    const parsed = readCache(whyCacheKey(repoId, fileId, scope, lvl));
+    if (!parsed) return null;
+    return {
+        explanation: parsed.explanation,
+        referenced_chunks: Array.isArray(parsed.referenced_chunks) ? parsed.referenced_chunks : [],
+        message: parsed.message,
+    };
+};
+
+const writeWhyCache = (repoId: string, fileId: number, scope: string, level: ExplainLevel, value: ExplainResponse) => {
+    writeCache(whyCacheKey(repoId, fileId, scope, level), value);
+};
+
 const clearExplainCache = (opts?: { repoId?: string }) => {
     try {
         const userId = useAuthStore.getState().user?.id || 'anon';
-        const prefix = `${EXPLAIN_CACHE_PREFIX}:${userId}:`;
-        const repoNeedle = opts?.repoId ? `${prefix}${opts.repoId}:` : null;
+        const prefixes = [
+            `${EXPLAIN_CACHE_PREFIX_V1}:${userId}:`,
+            `${EXPLAIN_CACHE_PREFIX_V2}:${userId}:`,
+            `${WHY_CACHE_PREFIX}:${userId}:`,
+        ];
         const toRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (!key) continue;
-            if (repoNeedle) {
-                if (key.startsWith(repoNeedle)) toRemove.push(key);
+            const matchesPrefix = prefixes.some((p) => key.startsWith(p));
+            if (!matchesPrefix) continue;
+
+            if (opts?.repoId) {
+                const matchesRepo = prefixes.some((p) => key.startsWith(`${p}${opts.repoId}:`));
+                if (matchesRepo) toRemove.push(key);
             } else {
-                if (key.startsWith(prefix)) toRemove.push(key);
+                toRemove.push(key);
             }
         }
         toRemove.forEach((k) => localStorage.removeItem(k));
@@ -164,9 +233,10 @@ const buildTree = (files: { id: number; file_path: string; language?: string }[]
 
 export const api = {
     getMe: async () => {
-        const user = await request<{ id: number; email: string; profile_image_url?: string }>('/auth/me');
+        const user = await request<{ id: number; username?: string; email: string; profile_image_url?: string }>('/auth/me');
         return {
             id: user.id.toString(),
+            username: user.username,
             email: user.email,
             profile_image_url: user.profile_image_url
         } as User & { profile_image_url?: string };
@@ -190,18 +260,32 @@ export const api = {
         return await response.json();
     },
     login: async (email: string, password: string, rememberMe: boolean) => {
-        const response = await request<{ user: { id: number; email: string } }>('/auth/login', {
+        const response = await request<{ user: { id: number; username?: string; email: string; profile_image_url?: string } }>('/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password, remember_me: rememberMe }),
         });
-        return { user: { id: response.user.id.toString(), email: response.user.email } } as { user: User };
+        return {
+            user: {
+                id: response.user.id.toString(),
+                username: response.user.username,
+                email: response.user.email,
+                profile_image_url: response.user.profile_image_url,
+            },
+        } as { user: User };
     },
-    signup: async (email: string, password: string, rememberMe: boolean = false) => {
-        const response = await request<{ user: { id: number; email: string } }>('/auth/signup', {
+    signup: async (username: string, email: string, password: string, rememberMe: boolean = false) => {
+        const response = await request<{ user: { id: number; username?: string; email: string; profile_image_url?: string } }>('/auth/signup', {
             method: 'POST',
-            body: JSON.stringify({ email, password, remember_me: rememberMe }),
+            body: JSON.stringify({ username, email, password, remember_me: rememberMe }),
         });
-        return { user: { id: response.user.id.toString(), email: response.user.email } } as { user: User };
+        return {
+            user: {
+                id: response.user.id.toString(),
+                username: response.user.username ?? username,
+                email: response.user.email,
+                profile_image_url: response.user.profile_image_url,
+            },
+        } as { user: User };
     },
     logout: async () => {
         const res = await request<{ status: string }>('/auth/logout', { method: 'POST' });
@@ -275,17 +359,71 @@ export const api = {
         request<{ file_path: string; language?: string; content: string }>(
             `/repos/${repoId}/files/${fileId}`
         ),
-    explainFile: async (repoId: string, fileId: number): Promise<ExplainResponse> => {
-        const cached = readExplainCache(repoId, fileId);
+    explainFile: async (repoId: string, fileId: number, opts?: { level?: ExplainLevel }): Promise<ExplainResponse> => {
+        const level = normalizeLevel(opts?.level);
+        const cached = readExplainCache(repoId, fileId, 'file', level);
         if (cached) return cached;
 
         const res = await request<ExplainResponse>(`/repos/${repoId}/files/${fileId}/explain`, {
             method: 'POST',
-            body: JSON.stringify({}),
+            body: JSON.stringify({ level }),
         });
-        writeExplainCache(repoId, fileId, res);
+        writeExplainCache(repoId, fileId, 'file', level, res);
         return res;
     },
+
+    explainSymbol: async (
+        repoId: string,
+        fileId: number,
+        payload: { function_name: string; start_line: number; end_line: number; level?: ExplainLevel }
+    ): Promise<ExplainResponse> => {
+        const level = normalizeLevel(payload.level);
+        const scope = `symbol:${payload.function_name}:${payload.start_line}:${payload.end_line}`;
+        const cached = readExplainCache(repoId, fileId, scope, level);
+        if (cached) return cached;
+
+        const res = await request<ExplainResponse>(`/repos/${repoId}/files/${fileId}/explain_symbol`, {
+            method: 'POST',
+            body: JSON.stringify({
+                function_name: payload.function_name,
+                start_line: payload.start_line,
+                end_line: payload.end_line,
+                level,
+            }),
+        });
+        writeExplainCache(repoId, fileId, scope, level, res);
+        return res;
+    },
+
+    whyWritten: async (
+        repoId: string,
+        fileId: number,
+        payload: { function_name?: string; start_line?: number; end_line?: number; level?: ExplainLevel }
+    ): Promise<ExplainResponse> => {
+        const level = normalizeLevel(payload.level);
+        const scope = payload.function_name
+            ? `symbol:${payload.function_name}:${payload.start_line || 0}:${payload.end_line || 0}`
+            : 'file';
+        const cached = readWhyCache(repoId, fileId, scope, level);
+        if (cached) return cached;
+
+        const res = await request<ExplainResponse>(`/repos/${repoId}/files/${fileId}/why_written`, {
+            method: 'POST',
+            body: JSON.stringify({
+                function_name: payload.function_name,
+                start_line: payload.start_line,
+                end_line: payload.end_line,
+                level,
+            }),
+        });
+        writeWhyCache(repoId, fileId, scope, level, res);
+        return res;
+    },
+
+    fetchRiskRadar: (repoId: string, fileId: number) =>
+        request<{ security: string[]; performance: string[]; maintainability: string[]; notes?: { security?: string; performance?: string; maintainability?: string } }>(
+            `/repos/${repoId}/files/${fileId}/risk_radar`
+        ),
 
     clearExplainCache: (repoId?: string) => clearExplainCache({ repoId }),
     fetchFileMetrics: (repoId: string, fileId: number) =>
@@ -297,14 +435,14 @@ export const api = {
             `/repos/${repoId}/analytics`
         ),
     fetchDashboardOverview: () => request<DashboardOverview>('/dashboard/overview'),
-    queryChat: (repoId: string, question: string) =>
+    queryChat: (repoId: string, question: string, opts?: { level?: ExplainLevel }) =>
         request<{ answer: string; referenced_files: string[]; token_usage: number; latency_ms: number }>('/query', {
             method: 'POST',
-            body: JSON.stringify({ repo_id: Number(repoId), question }),
+            body: JSON.stringify({ repo_id: Number(repoId), question, explain_level: normalizeLevel(opts?.level) }),
         }),
 
     fetchChatHistory: (repoId: string, limit: number = 100) =>
-        request<{ repo_id: number; messages: { id: string; role: 'user' | 'ai'; content: string; timestamp: string }[] }>(
+        request<{ repo_id: number; messages: { id: string; role: 'user' | 'ai'; content: string; timestamp: string; sources?: string[] }[] }>(
             `/repos/${repoId}/chat/history?limit=${encodeURIComponent(String(limit))}`
         ),
     fetchAnalytics: async () => {

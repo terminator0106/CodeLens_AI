@@ -60,7 +60,7 @@ export const Signup: React.FC = () => {
               }
               setLoading(true);
               try {
-                const response = await api.signup(email, password);
+                const response = await api.signup(fullName, email, password);
                 login(response.user);
                 navigate('/dashboard');
               } catch (err) {
@@ -71,7 +71,7 @@ export const Signup: React.FC = () => {
             }}
           >
             <Input
-              label="Full Name"
+              label="Username"
               type="text"
               required
               icon={<User size={18} />}

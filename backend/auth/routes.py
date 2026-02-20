@@ -41,7 +41,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     hashed = get_password_hash(payload.password)
-    user = crud.create_user(db, payload.email, hashed)
+    user = crud.create_user(db, payload.email, hashed, payload.username)
 
     ttl_seconds = _session_ttl_seconds(getattr(payload, "remember_me", False))
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))
@@ -217,7 +217,8 @@ async def github_oauth_callback(request: Request, response: Response, code: str 
     user = crud.get_user_by_email(db, email)
     if not user:
         random_password = secrets.token_urlsafe(32)
-        user = crud.create_user(db, email, get_password_hash(random_password))
+        default_username = (email.split("@", 1)[0] or "user") if email else "user"
+        user = crud.create_user(db, email, get_password_hash(random_password), default_username)
 
     ttl_seconds = _session_ttl_seconds(remember_me)
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))
@@ -302,7 +303,8 @@ async def google_oauth_callback(request: Request, code: str | None = None, state
     user = crud.get_user_by_email(db, email)
     if not user:
         random_password = secrets.token_urlsafe(32)
-        user = crud.create_user(db, email, get_password_hash(random_password))
+        default_username = (email.split("@", 1)[0] or "user") if email else "user"
+        user = crud.create_user(db, email, get_password_hash(random_password), default_username)
 
     ttl_seconds = _session_ttl_seconds(remember_me)
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))

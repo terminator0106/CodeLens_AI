@@ -1,5 +1,6 @@
 export interface User {
   id: string;
+  username?: string;
   email: string;
   avatarUrl?: string;
   profile_image_url?: string;
@@ -33,7 +34,10 @@ export interface ChatMessage {
   role: 'user' | 'ai';
   content: string;
   timestamp: Date;
+  sources?: string[];
 }
+
+export type ExplainLevel = 'beginner' | 'intermediate' | 'expert';
 
 export interface AnalyticsData {
   tokensUsed: number;

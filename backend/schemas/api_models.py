@@ -8,11 +8,13 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    username: Optional[str] = None
     email: str
     profile_image_url: Optional[str] = None
 
 
 class SignupRequest(BaseModel):
+    username: str
     email: str
     password: str = Field(min_length=8)
     remember_me: bool = False
@@ -89,6 +91,24 @@ class FileExplainResponse(BaseModel):
     message: Optional[str] = None
 
 
+class FileExplainRequest(BaseModel):
+    level: Optional[str] = None
+
+
+class FileExplainSymbolRequest(BaseModel):
+    function_name: str
+    start_line: int
+    end_line: int
+    level: Optional[str] = None
+
+
+class WhyWrittenRequest(BaseModel):
+    function_name: Optional[str] = None
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None
+    level: Optional[str] = None
+
+
 class FileMetricsResponse(BaseModel):
     lines: int
     chunks: int
@@ -113,6 +133,7 @@ class DashboardOverview(BaseModel):
 class QueryRequest(BaseModel):
     repo_id: int
     question: str
+    explain_level: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -128,6 +149,7 @@ class ChatHistoryMessage(BaseModel):
     role: str
     content: str
     timestamp: str
+    sources: List[str] = []
 
 
 class ChatHistoryResponse(BaseModel):

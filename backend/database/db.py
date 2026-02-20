@@ -32,6 +32,25 @@ def _ensure_user_profile_image_column(engine) -> None:
         return
 
 
+def _ensure_user_username_column(engine) -> None:
+    """Ensure the users.username column exists for existing SQLite DBs."""
+
+    try:
+        inspector = inspect(engine)
+        if "users" not in inspector.get_table_names():
+            return
+
+        columns = [col["name"] for col in inspector.get_columns("users")]
+        if "username" in columns:
+            return
+
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR"))
+            conn.commit()
+    except Exception:
+        return
+
+
 def init_db(database_url: str) -> None:
     """Initialize the database engine, apply lightweight migrations, and create tables."""
 
@@ -42,6 +61,7 @@ def init_db(database_url: str) -> None:
     # using an existing SQLite database.
     if database_url.startswith("sqlite"):
         _ensure_user_profile_image_column(engine)
+        _ensure_user_username_column(engine)
 
     SessionLocal.configure(bind=engine)
     Base.metadata.create_all(bind=engine)

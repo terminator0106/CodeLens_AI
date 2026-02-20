@@ -22,14 +22,74 @@ export const FileTree: React.FC<FileTreeProps> = ({ node, onSelect, selectedId, 
     }
   };
 
+  const getFileColor = () => {
+    // TypeScript/TSX
+    if (node.name.endsWith('.tsx')) return { icon: 'text-blue-400', text: 'text-blue-300' };
+    if (node.name.endsWith('.ts')) return { icon: 'text-blue-500', text: 'text-blue-400' };
+
+    // JavaScript/JSX
+    if (node.name.endsWith('.jsx')) return { icon: 'text-yellow-400', text: 'text-yellow-300' };
+    if (node.name.endsWith('.js')) return { icon: 'text-yellow-500', text: 'text-yellow-400' };
+
+    // Python
+    if (node.name.endsWith('.py')) return { icon: 'text-blue-400', text: 'text-blue-300' };
+
+    // JSON
+    if (node.name.endsWith('.json')) return { icon: 'text-green-400', text: 'text-green-300' };
+
+    // Markdown
+    if (node.name.endsWith('.md') || node.name.endsWith('.mdx')) return { icon: 'text-purple-400', text: 'text-purple-300' };
+
+    // CSS/SCSS/SASS
+    if (node.name.endsWith('.css')) return { icon: 'text-pink-400', text: 'text-pink-300' };
+    if (node.name.endsWith('.scss') || node.name.endsWith('.sass')) return { icon: 'text-pink-500', text: 'text-pink-400' };
+
+    // HTML
+    if (node.name.endsWith('.html')) return { icon: 'text-orange-500', text: 'text-orange-400' };
+
+    // Config files
+    if (node.name.match(/\.(yaml|yml)$/)) return { icon: 'text-red-400', text: 'text-red-300' };
+    if (node.name.match(/\.(toml|ini|conf)$/)) return { icon: 'text-gray-400', text: 'text-gray-300' };
+
+    // Image files
+    if (node.name.match(/\.(png|jpg|jpeg|gif|svg|webp)$/)) return { icon: 'text-purple-500', text: 'text-purple-400' };
+
+    // Env/config
+    if (node.name.match(/^\.env/)) return { icon: 'text-yellow-600', text: 'text-yellow-500' };
+
+    // Folders
+    if (node.type === 'folder') {
+      return { icon: isOpen ? 'text-yellow-500' : 'text-amber-500', text: 'text-foreground' };
+    }
+
+    // Default
+    return { icon: 'text-gray-400', text: 'text-muted-foreground' };
+  };
+
   const getIcon = () => {
-    if (node.type === 'folder') return isOpen ? <FolderOpen size={16} className="text-primary" /> : <Folder size={16} className="text-muted-foreground" />;
-    if (node.name.endsWith('.tsx') || node.name.endsWith('.jsx')) return <FileCode size={16} className="text-chart-blue" />;
-    if (node.name.endsWith('.ts') || node.name.endsWith('.js')) return <FileCode size={16} className="text-chart-yellow" />;
-    if (node.name.endsWith('.json')) return <FileJson size={16} className="text-chart-green" />;
-    if (node.name.endsWith('.md')) return <FileText size={16} className="text-muted-foreground" />;
-    if (node.name.endsWith('.css') || node.name.endsWith('.scss')) return <FileType size={16} className="text-primary/60" />;
-    return <File size={16} className="text-muted-foreground" />;
+    const colors = getFileColor();
+
+    if (node.type === 'folder') {
+      return isOpen ? <FolderOpen size={16} className={colors.icon} /> : <Folder size={16} className={colors.icon} />;
+    }
+
+    // TypeScript/JavaScript
+    if (node.name.match(/\.(tsx?|jsx?)$/)) return <FileCode size={16} className={colors.icon} />;
+
+    // Python
+    if (node.name.endsWith('.py')) return <FileCode size={16} className={colors.icon} />;
+
+    // JSON
+    if (node.name.endsWith('.json')) return <FileJson size={16} className={colors.icon} />;
+
+    // Markdown
+    if (node.name.match(/\.mdx?$/)) return <FileText size={16} className={colors.icon} />;
+
+    // CSS/Styles
+    if (node.name.match(/\.(css|scss|sass)$/)) return <FileType size={16} className={colors.icon} />;
+
+    // Default
+    return <File size={16} className={colors.icon} />;
   };
 
   const fileCount = node.children?.filter(c => c.type === 'file').length || 0;

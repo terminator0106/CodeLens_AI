@@ -19,7 +19,14 @@ from database.db import SessionLocal
 from database.models import CodeChunk, CodeFile
 from schemas.api_models import RepoFilesResponse, RepoIngestRequest, RepoResponse, FileResponse, FileContentResponse
 from schemas.api_models import RepoIngestResponse, RepoReingestRequest
-from schemas.api_models import FileExplainResponse, FileMetricsResponse, RepoAnalyticsResponse
+from schemas.api_models import (
+    FileExplainRequest,
+    FileExplainResponse,
+    FileExplainSymbolRequest,
+    FileMetricsResponse,
+    RepoAnalyticsResponse,
+    WhyWrittenRequest,
+)
 from vectorstore.faiss_index import add_embeddings
 from .file_reader import read_code_files
 from .chunker import chunk_text
@@ -515,6 +522,7 @@ def get_file_content(
 def explain_file(
     repo_id: int,
     file_id: int,
+    payload: FileExplainRequest = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -532,6 +540,14 @@ def explain_file(
     chunks = crud.list_chunks_by_file(db, code_file.id)
     if not chunks:
         return FileExplainResponse(message="No indexed code found for this file", referenced_chunks=[])
+
+    def _normalize_level(level: str | None) -> str:
+        raw = (level or "").strip().lower()
+        if raw in {"beginner", "intermediate", "expert"}:
+            return raw
+        return "intermediate"
+
+    level = _normalize_level(getattr(payload, "level", None) if payload is not None else None)
 
     # If the LLM isn't configured, return a non-hallucinated message instead of a 500.
     # (Explain is LLM-backed by design, but it must fail clearly when keys are missing.)
@@ -559,14 +575,35 @@ def explain_file(
         [f"[chunk_index={c.chunk_index}]\n{c.chunk_content}" for c in selected_chunks]
     )
 
+    if level == "beginner":
+        fmt = (
+            "Output format (plain text):\n"
+            "- 6 to 9 bullet points (use '-' bullets).\n"
+            "- Each bullet must be one sentence.\n"
+            "- No preamble, no code blocks.\n"
+            "Style: explain for a new engineer; define acronyms briefly; keep it concrete."
+        )
+    elif level == "expert":
+        fmt = (
+            "Output format (plain text):\n"
+            "- 4 to 7 bullet points (use '-' bullets).\n"
+            "- Each bullet must be one sentence.\n"
+            "- No preamble, no code blocks.\n"
+            "Style: expert concise; focus on invariants, edge cases, and interfaces."
+        )
+    else:
+        fmt = (
+            "Output format (plain text):\n"
+            "- 6 to 9 bullet points (use '-' bullets).\n"
+            "- Each bullet must be one sentence.\n"
+            "- No preamble, no code blocks.\n"
+            "Style: concise but meaningfully informative."
+        )
+
     system_prompt = (
         "You are CodeLens AI. Explain the given file using ONLY the provided code context. "
-        "Do not speculate. Keep the answer medium-length: concise but meaningfully informative. "
-        "If the code context is insufficient, say so briefly and only describe what is supported.\n\n"
-        "Output format (plain text):\n"
-        "- 6 to 9 bullet points (use '-' bullets).\n"
-        "- Each bullet must be one sentence.\n"
-        "- No preamble, no code blocks, no long walkthrough.\n"
+        "Do not speculate. If the code context is insufficient, say so briefly and only describe what is supported.\n\n"
+        f"{fmt}\n"
         "Coverage requirements (include what applies): purpose, key responsibilities, important inputs/outputs, "
         "notable dependencies/integrations, and any important edge cases/assumptions visible in the code."
     )
@@ -580,7 +617,7 @@ def explain_file(
         explanation, _token_usage = generate_answer(
             system_prompt,
             user_prompt,
-            max_tokens=512,
+            max_tokens=512 if level != "expert" else 384,
             temperature=0.15,
         )
     except HTTPException as exc:
@@ -590,6 +627,340 @@ def explain_file(
     explanation = (explanation or "").strip()
     referenced = [int(c.chunk_index) for c in selected_chunks]
     return FileExplainResponse(explanation=explanation, referenced_chunks=referenced)
+
+
+def _slice_lines(text: str, start_line: int, end_line: int, *, max_chars: int = 6000) -> str:
+    lines = (text or "").splitlines()
+    n = len(lines)
+    s = max(1, min(int(start_line), max(1, n)))
+    e = max(s, min(int(end_line), n))
+    snippet = "\n".join(lines[s - 1 : e])
+    if len(snippet) > max_chars:
+        snippet = snippet[:max_chars] + "\n…"
+    return snippet
+
+
+def _file_header(text: str, *, max_lines: int = 80, max_chars: int = 3000) -> str:
+    lines = (text or "").splitlines()[: max(0, int(max_lines))]
+    header = "\n".join(lines)
+    if len(header) > max_chars:
+        header = header[:max_chars] + "\n…"
+    return header
+
+
+def _require_groq_or_message() -> str | None:
+    provider = (settings.llm_provider or "").strip().lower() or "groq"
+    if provider != "groq":
+        return "This feature is Groq-only in this build." 
+    if not os.getenv("GROQ_API_KEY"):
+        return "LLM is not configured (GROQ_API_KEY is not set)."
+    return None
+
+
+@router.post("/{repo_id}/files/{file_id}/explain_symbol", response_model=FileExplainResponse)
+def explain_symbol(
+    repo_id: int,
+    file_id: int,
+    payload: FileExplainSymbolRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = crud.get_repo_by_id_any(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    if repo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    code_file = crud.get_file_by_id(db, repo_id, file_id)
+    if not code_file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    msg = _require_groq_or_message()
+    if msg:
+        return FileExplainResponse(message=msg, referenced_chunks=[])
+
+    raw = code_file.raw_content or ""
+    fn = (payload.function_name or "").strip()
+    start_line = int(payload.start_line or 1)
+    end_line = int(payload.end_line or start_line)
+    level = (payload.level or "").strip().lower()
+    if level not in {"beginner", "intermediate", "expert"}:
+        level = "intermediate"
+
+    snippet = _slice_lines(raw, start_line, end_line, max_chars=7000)
+    header = _file_header(raw)
+
+    if level == "beginner":
+        fmt = (
+            "- 5 to 8 bullet points (use '-' bullets).\n"
+            "- Each bullet must be one sentence.\n"
+            "- No preamble, no code blocks.\n"
+            "Style: beginner-friendly and concrete; define jargon briefly."
+        )
+    elif level == "expert":
+        fmt = (
+            "- 4 to 7 bullet points (use '-' bullets).\n"
+            "- Each bullet must be one sentence.\n"
+            "- No preamble, no code blocks.\n"
+            "Style: expert concise; focus on invariants, edge cases, and side effects."
+        )
+    else:
+        fmt = (
+            "- 6 to 9 bullet points (use '-' bullets).\n"
+            "- Each bullet must be one sentence.\n"
+            "- No preamble, no code blocks.\n"
+            "Style: concise, practical."
+        )
+
+    system_prompt = (
+        "You are CodeLens AI. Explain ONLY the selected function using ONLY the provided file context. "
+        "Do not speculate beyond what is shown. If context is insufficient, say so briefly.\n\n"
+        "Output format (plain text):\n"
+        f"{fmt}"
+    )
+
+    user_prompt = (
+        f"File: {code_file.file_path}\nLanguage: {code_file.language}\n\n"
+        f"File header (for imports/types only):\n{header}\n\n"
+        f"Selected function: {fn} (lines {start_line}-{end_line})\n\n"
+        f"Function code:\n{snippet}\n\n"
+        "Task: Explain what this function does, its inputs/outputs, side effects, and any visible edge cases."
+    )
+
+    try:
+        explanation, _token_usage = generate_answer(
+            system_prompt,
+            user_prompt,
+            max_tokens=384 if level == "expert" else 512,
+            temperature=0.1,
+        )
+    except HTTPException as exc:
+        return FileExplainResponse(message=str(exc.detail), referenced_chunks=[])
+
+    return FileExplainResponse(explanation=(explanation or "").strip(), referenced_chunks=[])
+
+
+@router.post("/{repo_id}/files/{file_id}/why_written", response_model=FileExplainResponse)
+def why_written(
+    repo_id: int,
+    file_id: int,
+    payload: WhyWrittenRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    repo = crud.get_repo_by_id_any(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    if repo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    code_file = crud.get_file_by_id(db, repo_id, file_id)
+    if not code_file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    msg = _require_groq_or_message()
+    if msg:
+        return FileExplainResponse(message=msg, referenced_chunks=[])
+
+    raw = code_file.raw_content or ""
+    level = (payload.level or "").strip().lower()
+    if level not in {"beginner", "intermediate", "expert"}:
+        level = "intermediate"
+
+    header = _file_header(raw)
+    scope = "file"
+    snippet = ""
+    if payload.function_name and payload.start_line and payload.end_line:
+        fn = (payload.function_name or "").strip()
+        scope = f"function {fn}"
+        snippet = _slice_lines(raw, int(payload.start_line), int(payload.end_line), max_chars=7000)
+
+    system_prompt = (
+        "You are CodeLens AI. Answer using ONLY the provided code. "
+        "Do not invent repository context. Avoid confident claims about intent you cannot support.\n\n"
+        "Output format (plain text):\n"
+        "- One short paragraph (3 to 5 sentences).\n"
+        "- No bullets, no code blocks.\n"
+        "Style: thoughtful, grounded in observable tradeoffs (readability, performance, API design, safety)."
+    )
+
+    user_prompt = (
+        f"File: {code_file.file_path}\nLanguage: {code_file.language}\n\n"
+        f"File header:\n{header}\n\n"
+        + (f"Selected function code:\n{snippet}\n\n" if snippet else "")
+        + f"Question: Why might this {scope} be written this way?"
+    )
+
+    try:
+        explanation, _token_usage = generate_answer(
+            system_prompt,
+            user_prompt,
+            max_tokens=256,
+            temperature=0.2,
+        )
+    except HTTPException as exc:
+        return FileExplainResponse(message=str(exc.detail), referenced_chunks=[])
+
+    return FileExplainResponse(explanation=(explanation or "").strip(), referenced_chunks=[])
+
+
+@router.get("/{repo_id}/risk_radar")
+def risk_radar(
+    repo_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Deterministic risk heuristics.
+
+    The UI expects file-scoped results. Use:
+    GET /repos/{repo_id}/files/{file_id}/risk_radar
+    """
+    raise HTTPException(
+        status_code=400,
+        detail="Risk radar is file-scoped. Call /repos/{repo_id}/files/{file_id}/risk_radar instead.",
+    )
+
+
+@router.get("/{repo_id}/files/{file_id}/risk_radar")
+def risk_radar_file(
+    repo_id: int,
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Deterministic file-level risk heuristics (no AI)."""
+    repo = crud.get_repo_by_id_any(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    if repo.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    code_file = crud.get_file_by_id(db, repo_id, file_id)
+    if not code_file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    security_hits: list[str] = []
+    perf_hits: list[str] = []
+    maintain_hits: list[str] = []
+
+    secret_re = re.compile(r"(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][^'\"]{8,}['\"]", re.IGNORECASE)
+    eval_re = re.compile(r"\b(eval|exec)\s*\(")
+    shell_re = re.compile(r"shell\s*=\s*True")
+    xss_re = re.compile(r"dangerouslySetInnerHTML")
+    sql_re = re.compile(r"\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b", re.IGNORECASE)
+    type_suppress_re = re.compile(
+        r"(#\s*type:\s*ignore\b|@ts-ignore\b|@ts-expect-error\b|\bas\s+any\b|:\s*any\b|<any>\b)",
+        re.IGNORECASE,
+    )
+
+    path = (code_file.file_path or "").strip().replace("\\", "/")
+    raw = code_file.raw_content or ""
+
+    if raw:
+        # Security
+        if secret_re.search(raw):
+            security_hits.append(f"{path}: possible hardcoded secret-like value")
+        if eval_re.search(raw):
+            security_hits.append(f"{path}: uses eval/exec")
+        if shell_re.search(raw):
+            security_hits.append(f"{path}: uses shell=True")
+        if xss_re.search(raw):
+            security_hits.append(f"{path}: uses dangerouslySetInnerHTML")
+        if sql_re.search(raw) and re.search(r"execute\(.*\+|f\".*(SELECT|INSERT|UPDATE|DELETE)", raw, re.IGNORECASE):
+            security_hits.append(f"{path}: possible dynamic SQL construction")
+
+        # Performance
+        if len(raw) > 300_000:
+            perf_hits.append(f"{path}: very large file ({len(raw)} chars)")
+        if re.search(r"for\s*\(.*\)\s*\{[\s\S]{0,2000}for\s*\(", raw):
+            perf_hits.append(f"{path}: nested loops pattern")
+        if re.search(r"\.map\(.*\.map\(", raw):
+            perf_hits.append(f"{path}: nested map pattern")
+
+        # Maintainability
+        lines = raw.splitlines()
+        if len(lines) > 1200:
+            maintain_hits.append(f"{path}: very long file ({len(lines)} lines)")
+        if re.search(r"TODO|FIXME", raw):
+            maintain_hits.append(f"{path}: contains TODO/FIXME")
+        if type_suppress_re.search(raw):
+            maintain_hits.append(f"{path}: suppresses type checking")
+
+    def _stable_top(items: list[str], n: int = 12) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for it in items:
+            s = (it or "").strip()
+            if not s or s in seen:
+                continue
+            seen.add(s)
+            out.append(s)
+            if len(out) >= n:
+                break
+        return out
+
+    security_out = _stable_top(security_hits)
+    perf_out = _stable_top(perf_hits)
+    maintain_out = _stable_top(maintain_hits)
+
+    notes: dict[str, str] = {}
+    needs_notes = (len(security_out) == 0) or (len(perf_out) == 0) or (len(maintain_out) == 0)
+
+    if needs_notes:
+        header = _file_header(raw)
+        msg = _require_groq_or_message()
+        if msg:
+            # Fallback if AI provider is not configured.
+            if len(security_out) == 0:
+                notes["security"] = "Looks clean — no obvious security red flags detected in this file."
+            if len(perf_out) == 0:
+                notes["performance"] = "Looks good — no obvious performance hotspots detected in this file."
+            if len(maintain_out) == 0:
+                notes["maintainability"] = "Looks maintainable — no obvious maintainability issues detected in this file."
+        else:
+            system_prompt = (
+                "You are CodeLens AI. Generate short, optimistic status notes for a file risk scan. "
+                "Be cautious: say 'no obvious signals' rather than guarantees.\n\n"
+                "Return STRICT JSON only, no markdown, no extra keys.\n"
+                "Schema: {\"security\": string, \"performance\": string, \"maintainability\": string}"
+            )
+
+            user_prompt = (
+                f"File: {path}\nLanguage: {code_file.language}\n\n"
+                f"File header:\n{header}\n\n"
+                "Write one sentence per category (max ~14 words each)."
+            )
+
+            try:
+                raw_notes, _token_usage = generate_answer(
+                    system_prompt,
+                    user_prompt,
+                    max_tokens=128,
+                    temperature=0.2,
+                )
+                parsed = json.loads((raw_notes or "").strip() or "{}")
+                if isinstance(parsed, dict):
+                    if len(security_out) == 0:
+                        notes["security"] = str(parsed.get("security") or "").strip()
+                    if len(perf_out) == 0:
+                        notes["performance"] = str(parsed.get("performance") or "").strip()
+                    if len(maintain_out) == 0:
+                        notes["maintainability"] = str(parsed.get("maintainability") or "").strip()
+            except Exception:
+                # If AI output is malformed, fall back to safe optimistic notes.
+                if len(security_out) == 0:
+                    notes["security"] = "Looks clean — no obvious security red flags detected in this file."
+                if len(perf_out) == 0:
+                    notes["performance"] = "Looks good — no obvious performance hotspots detected in this file."
+                if len(maintain_out) == 0:
+                    notes["maintainability"] = "Looks maintainable — no obvious maintainability issues detected in this file."
+
+    return {
+        "security": security_out,
+        "performance": perf_out,
+        "maintainability": maintain_out,
+        "notes": notes,
+    }
 
 
 @router.get("/{repo_id}/files/{file_id}/metrics", response_model=FileMetricsResponse)

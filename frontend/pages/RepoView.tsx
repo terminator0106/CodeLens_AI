@@ -2,17 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FileTree } from '../components/repo/FileTree';
 import { CodeViewer } from '../components/repo/CodeViewer';
-import { useRepoStore } from '../store';
+import { useRepoStore, useUIStore } from '../store';
 import { api } from '../services/api';
 import { ChevronRight, ArrowLeft, MessageSquare, Box, Layers, BookOpen, Settings, Search, GitBranch, CheckCircle2, Zap, TrendingUp, Network, FileCode } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { FileNode } from '../types';
+import { SyntaxText } from '../components/ui/SyntaxText';
 
 export const RepoView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { fileTree, setFileTree, selectedFile, selectFile, repositories, setRepositories, selectRepo, selectedRepo, removeRepository } = useRepoStore();
     const navigate = useNavigate();
+    const explainLevel = useUIStore((s) => s.explainLevel);
+    const setExplainLevel = useUIStore((s) => s.setExplainLevel);
     const [activeTab, setActiveTab] = useState<'code' | 'explain' | 'deps'>('code');
     const [searchTerm, setSearchTerm] = useState('');
     const [treeLoading, setTreeLoading] = useState(true);
@@ -24,6 +27,15 @@ export const RepoView: React.FC = () => {
     const [explainError, setExplainError] = useState('');
     const [explanation, setExplanation] = useState<string>('');
     const [explainMessage, setExplainMessage] = useState<string>('');
+
+    const [symbolFocus, setSymbolFocus] = useState<{ function_name: string; start_line: number; end_line: number } | null>(null);
+    const [whyLoading, setWhyLoading] = useState(false);
+    const [whyError, setWhyError] = useState('');
+    const [whyText, setWhyText] = useState('');
+
+    const [riskLoading, setRiskLoading] = useState(false);
+    const [riskError, setRiskError] = useState('');
+    const [risk, setRisk] = useState<{ security: string[]; performance: string[]; maintainability: string[]; notes?: { security?: string; performance?: string; maintainability?: string } } | null>(null);
 
     const [metricsLoading, setMetricsLoading] = useState(false);
     const [metricsError, setMetricsError] = useState('');
@@ -78,6 +90,11 @@ export const RepoView: React.FC = () => {
         setExplainMessage('');
         setMetricsError('');
         setMetrics(null);
+        setSymbolFocus(null);
+        setWhyError('');
+        setWhyText('');
+        setRiskError('');
+        setRisk(null);
     }, [selectedFile?.id]);
 
     useEffect(() => {
@@ -90,7 +107,14 @@ export const RepoView: React.FC = () => {
             setExplanation('');
             setExplainMessage('');
             try {
-                const res = await api.explainFile(id, selectedFile.fileId);
+                const res = symbolFocus
+                    ? await api.explainSymbol(id, selectedFile.fileId, {
+                        function_name: symbolFocus.function_name,
+                        start_line: symbolFocus.start_line,
+                        end_line: symbolFocus.end_line,
+                        level: explainLevel,
+                    })
+                    : await api.explainFile(id, selectedFile.fileId, { level: explainLevel });
                 if (res.message) {
                     setExplainMessage(res.message);
                 } else {
@@ -103,7 +127,26 @@ export const RepoView: React.FC = () => {
             }
         };
         run();
-    }, [activeTab, tabsEnabled, id, selectedFile?.fileId]);
+    }, [activeTab, tabsEnabled, id, selectedFile?.fileId, symbolFocus, explainLevel]);
+
+    useEffect(() => {
+        const run = async () => {
+            if (!tabsEnabled || !id || !selectedFile?.fileId) return;
+            if (activeTab !== 'deps') return;
+
+            setRiskLoading(true);
+            setRiskError('');
+            try {
+                const res = await api.fetchRiskRadar(id, selectedFile.fileId);
+                setRisk(res);
+            } catch (err) {
+                setRiskError((err as Error).message || 'Unable to load risk radar.');
+            } finally {
+                setRiskLoading(false);
+            }
+        };
+        run();
+    }, [activeTab, id, tabsEnabled, selectedFile?.fileId]);
 
     useEffect(() => {
         const run = async () => {
@@ -145,6 +188,36 @@ export const RepoView: React.FC = () => {
             selectFile({ ...node, content: '' });
         } finally {
             setFileLoading(false);
+        }
+    };
+
+    const handleAskSymbol = (payload: { function_name: string; start_line: number; end_line: number }) => {
+        setSymbolFocus(payload);
+        setActiveTab('explain');
+    };
+
+    const handleWhyWritten = async () => {
+        if (!id || !selectedFile?.fileId) return;
+
+        setWhyLoading(true);
+        setWhyError('');
+        setWhyText('');
+        try {
+            const res = await api.whyWritten(id, selectedFile.fileId, {
+                function_name: symbolFocus?.function_name,
+                start_line: symbolFocus?.start_line,
+                end_line: symbolFocus?.end_line,
+                level: explainLevel,
+            });
+            if (res.message) {
+                setWhyError(res.message);
+            } else {
+                setWhyText(res.explanation || '');
+            }
+        } catch (err) {
+            setWhyError((err as Error).message || 'Unable to generate rationale.');
+        } finally {
+            setWhyLoading(false);
         }
     };
 
@@ -301,7 +374,7 @@ export const RepoView: React.FC = () => {
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-hidden relative bg-background">
                     {activeTab === 'code' && (
-                        <CodeViewer file={selectedFile} isLoading={fileLoading} error={fileError} />
+                        <CodeViewer file={selectedFile} isLoading={fileLoading} error={fileError} onAskSymbol={handleAskSymbol} />
                     )}
 
                     {activeTab === 'explain' && (
@@ -314,14 +387,51 @@ export const RepoView: React.FC = () => {
                                             <div>
                                                 <div className="text-2xl font-bold text-foreground">{selectedFile.name}</div>
                                                 <div className="text-sm text-muted-foreground font-normal mt-1">{selectedFile.filePath}</div>
+                                                {symbolFocus && (
+                                                    <div className="text-xs text-muted-foreground font-normal mt-1">
+                                                        Scope: <span className="text-foreground font-medium">{symbolFocus.function_name}</span> (lines {symbolFocus.start_line}-{symbolFocus.end_line})
+                                                        <button
+                                                            type="button"
+                                                            className="ml-2 inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-foreground/90 hover:text-foreground hover:bg-secondary/40 transition-colors"
+                                                            onClick={() => setSymbolFocus(null)}
+                                                        >
+                                                            clear
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </h1>
-                                        {!!explanation && !explainMessage && !explainError && !explainLoading && (
-                                            <span className="text-xs font-semibold uppercase tracking-wide bg-accent/20 border border-accent text-accent px-3 py-1.5 rounded-full flex items-center">
-                                                <CheckCircle2 size={14} className="mr-1.5" />
-                                                AI Generated
-                                            </span>
-                                        )}
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-secondary/30 p-1 rounded-lg flex space-x-1">
+                                                {(['beginner', 'intermediate', 'expert'] as const).map((lvl) => (
+                                                    <button
+                                                        key={lvl}
+                                                        type="button"
+                                                        onClick={() => setExplainLevel(lvl)}
+                                                        className={`px-3 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wide transition-all ${explainLevel === lvl
+                                                            ? 'bg-primary/20 text-primary shadow-sm underline underline-offset-4 decoration-2 decoration-primary'
+                                                            : 'text-muted-foreground hover:text-foreground'
+                                                            }`}
+                                                    >
+                                                        {lvl}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={handleWhyWritten}
+                                                disabled={explainLoading || whyLoading}
+                                            >
+                                                {whyLoading ? 'Thinking…' : 'Why written this way?'}
+                                            </Button>
+                                            {/* {!!explanation && !explainMessage && !explainError && !explainLoading && (
+                                                <span className="text-xs font-semibold uppercase tracking-wide bg-accent/20 border border-accent text-accent px-3 py-1.5 rounded-full flex items-center">
+                                                    <CheckCircle2 size={14} className="mr-1.5" />
+                                                    AI Generated
+                                                </span>
+                                            )} */}
+                                        </div>
                                     </div>
                                     <div className="bg-primary/10 p-8 rounded-2xl border border-primary/20 shadow-lg relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-6 opacity-5"><MessageSquare size={150} /></div>
@@ -348,17 +458,8 @@ export const RepoView: React.FC = () => {
                                             )}
                                             {!explainLoading && !explainError && !explainMessage && explanation && (
                                                 <div className="prose prose-lg prose-invert max-w-none">
-                                                    <div className="text-base leading-relaxed text-foreground space-y-4">
-                                                        {explanation.split('\n').map((para, i) => {
-                                                            // Parse basic markdown: **bold**, *italic*, `code`
-                                                            const formatted = para
-                                                                .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>')
-                                                                .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
-                                                                .replace(/`(.+?)`/g, '<code class="bg-primary/20 text-primary px-2 py-0.5 rounded text-sm font-mono">$1</code>');
-                                                            return para.trim() ? (
-                                                                <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
-                                                            ) : null;
-                                                        })}
+                                                    <div className="text-base leading-relaxed text-foreground">
+                                                        <SyntaxText text={explanation} />
                                                     </div>
                                                 </div>
                                             )}
@@ -367,6 +468,18 @@ export const RepoView: React.FC = () => {
                                             )}
                                         </div>
                                     </div>
+
+                                    {(whyText || whyError) && (
+                                        <div className="mt-6 bg-card p-6 rounded-2xl border border-border shadow-card">
+                                            <div className="text-sm font-bold text-foreground mb-2">Why this is written this way</div>
+                                            {whyError && (
+                                                <div className="text-sm text-red-400">{whyError}</div>
+                                            )}
+                                            {whyText && (
+                                                <div className="text-sm text-foreground leading-relaxed">{whyText}</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
@@ -390,8 +503,44 @@ export const RepoView: React.FC = () => {
                                             File Analysis
                                         </h2>
                                         <span className="text-xs font-semibold uppercase tracking-wide bg-secondary/40 border border-border text-foreground px-3 py-1.5 rounded-full">
-                                            Deterministic
+                                            AI-assisted
                                         </span>
+                                    </div>
+
+                                    <div className="bg-card p-6 rounded-2xl border border-border shadow-float mb-8">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="text-lg font-bold text-foreground">Risk Radar</div>
+                                            <span className="text-xs font-semibold uppercase tracking-wide bg-secondary/40 border border-border text-foreground px-3 py-1.5 rounded-full">AI-assisted</span>
+                                        </div>
+                                        {riskLoading && <div className="text-sm text-muted-foreground">Scanning…</div>}
+                                        {riskError && !riskLoading && <div className="text-sm text-red-400">{riskError}</div>}
+                                        {!riskLoading && !riskError && risk && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-cols-fr">
+                                                {([
+                                                    { title: 'Security', key: 'security', items: risk.security },
+                                                    { title: 'Performance', key: 'performance', items: risk.performance },
+                                                    { title: 'Maintainability', key: 'maintainability', items: risk.maintainability },
+                                                ] as const).map((col) => (
+                                                    <div key={col.title} className="bg-secondary/20 border border-border rounded-xl p-4 min-w-0">
+                                                        <div className="text-sm font-bold text-foreground mb-2">{col.title}</div>
+                                                        {col.items.length === 0 ? (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {risk.notes?.[col.key] || 'Looks good — no obvious signals found in this file.'}
+                                                            </div>
+                                                        ) : (
+                                                            <ul className="space-y-2 text-xs text-foreground">
+                                                                {col.items.map((x) => (
+                                                                    <li key={x} className="flex items-start gap-2 leading-relaxed">
+                                                                        <span className="text-foreground mt-0.5 flex-shrink-0">•</span>
+                                                                        <span className="break-words min-w-0 flex-1">{x}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {metricsLoading && (

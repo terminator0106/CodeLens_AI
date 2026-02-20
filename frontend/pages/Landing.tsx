@@ -27,7 +27,6 @@ export const Landing: React.FC = () => {
             <div className="hidden md:flex items-center space-x-10">
               <Link to="/products" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Products</Link>
               <Link to="/solutions" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Solutions</Link>
-              <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
               <Link to="/docs" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
             </div>
             <div className="flex items-center space-x-4">
@@ -57,11 +56,11 @@ export const Landing: React.FC = () => {
       </nav>
 
       {/* Hero Section with Background Paths */}
-      <div className="relative">
+      <div className="relative min-h-[600px] md:min-h-[700px]">
         <BackgroundPaths title="Code Intelligence" showTitle={false} />
 
         {/* Overlay content on top of background paths */}
-        <div className="absolute top-0 left-0 right-0 flex flex-col justify-start pt-20 md:pt-24 z-20">
+        <div className="absolute top-0 left-0 right-0 flex flex-col justify-start pt-20 md:pt-24 pb-32 md:pb-40 z-20">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
             <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-secondary/80 border border-border text-primary text-xs font-bold mb-8 uppercase tracking-wide shadow-card backdrop-blur-md">
               <span className="flex h-2 w-2 rounded-full bg-accent mr-2 animate-pulse"></span>
@@ -112,10 +111,13 @@ export const Landing: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Gradient fade to blend into next section */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-background z-10 pointer-events-none"></div>
       </div>
 
       {/* Interactive Demo Section */}
-      <section className="relative py-24 bg-background overflow-hidden">
+      <section className="relative -mt-16 pt-8 pb-24 bg-background overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mt-20 max-w-6xl mx-auto">
             <div className="relative bg-card rounded-2xl border border-border shadow-float overflow-hidden">
