@@ -3,10 +3,27 @@ from pathlib import Path
 from typing import List
 
 BASE_DIR = Path(__file__).resolve().parent
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=BASE_DIR / ".env")
+except ImportError:
+    # Fallback to manual parsing if python-dotenv is not installed in the current environment
+    dotenv_path = BASE_DIR / ".env"
+    if dotenv_path.exists():
+        with open(dotenv_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, val = line.split("=", 1)
+                    key = key.strip()
+                    val = val.strip()
+                    if val.startswith('"') and val.endswith('"'):
+                        val = val[1:-1]
+                    elif val.startswith("'") and val.endswith("'"):
+                        val = val[1:-1]
+                    if key not in os.environ:
+                        os.environ[key] = val
 
-BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(dotenv_path=BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / "vectorstore" / "data"
 
 
@@ -64,7 +81,7 @@ class Settings:
         self.chat_model = os.getenv("CHAT_MODEL", "openai/gpt-4o-mini")
         self.llm_provider = os.getenv("LLM_PROVIDER", "groq")
         self.openrouter_base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-        self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        self.groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
         self.top_k = int(os.getenv("RAG_TOP_K", "4"))
         self.max_context_tokens = int(os.getenv("MAX_CONTEXT_TOKENS", "1800"))
 

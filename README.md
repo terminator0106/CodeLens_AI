@@ -82,7 +82,7 @@ Minimal `backend/.env` (Groq-only chat):
 ```env
 LLM_PROVIDER=groq
 GROQ_API_KEY=YOUR_KEY_HERE
-GROQ_MODEL=llama-3.1-8b-instant
+GROQ_MODEL=openai/gpt-oss-20b
 
 # Recommended for demo stability (no embeddings calls)
 DISABLE_EMBEDDINGS=true
