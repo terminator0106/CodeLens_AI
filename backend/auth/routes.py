@@ -34,6 +34,22 @@ def _frontend_redirect(path: str) -> str:
     return f"{base}/#{normalized}"
 
 
+def _set_auth_cookie(response: Response, token: str, ttl_seconds: int):
+    # For cross-site cookie support (e.g. hosted Vercel frontend calling local or separate backend),
+    # we need samesite="none" and secure=True so the browser doesn't block/drop the cookie on API calls.
+    # Chrome/Firefox treat localhost as a secure context, allowing secure=True over HTTP on localhost.
+    response.set_cookie(
+        settings.cookie_name,
+        token,
+        httponly=True,
+        samesite="none",
+        secure=True,
+        max_age=ttl_seconds,
+        expires=ttl_seconds,
+    )
+
+
+
 @router.post("/signup", response_model=AuthResponse)
 def signup(payload: SignupRequest, response: Response, db: Session = Depends(get_db)):
     """Register a new user and set auth cookie."""
@@ -45,15 +61,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
 
     ttl_seconds = _session_ttl_seconds(getattr(payload, "remember_me", False))
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))
-    response.set_cookie(
-        settings.cookie_name,
-        token,
-        httponly=True,
-        samesite="lax",
-        secure=settings.secure_cookies,
-        max_age=ttl_seconds,
-        expires=ttl_seconds,
-    )
+    _set_auth_cookie(response, token, ttl_seconds)
     return AuthResponse(user=UserResponse.model_validate(user))
 
 
@@ -66,15 +74,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
 
     ttl_seconds = _session_ttl_seconds(getattr(payload, "remember_me", False))
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))
-    response.set_cookie(
-        settings.cookie_name,
-        token,
-        httponly=True,
-        samesite="lax",
-        secure=settings.secure_cookies,
-        max_age=ttl_seconds,
-        expires=ttl_seconds,
-    )
+    _set_auth_cookie(response, token, ttl_seconds)
     return AuthResponse(user=UserResponse.model_validate(user))
 
 
@@ -223,15 +223,7 @@ async def github_oauth_callback(request: Request, response: Response, code: str 
     ttl_seconds = _session_ttl_seconds(remember_me)
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))
     redirect = RedirectResponse(url=_frontend_redirect("/dashboard"), status_code=302)
-    redirect.set_cookie(
-        settings.cookie_name,
-        token,
-        httponly=True,
-        samesite="lax",
-        secure=settings.secure_cookies,
-        max_age=ttl_seconds,
-        expires=ttl_seconds,
-    )
+    _set_auth_cookie(redirect, token, ttl_seconds)
     redirect.delete_cookie("oauth_state")
     redirect.delete_cookie("oauth_remember")
     return redirect
@@ -309,15 +301,7 @@ async def google_oauth_callback(request: Request, code: str | None = None, state
     ttl_seconds = _session_ttl_seconds(remember_me)
     token = create_access_token(str(user.id), user.email, expires_delta=timedelta(seconds=ttl_seconds))
     redirect = RedirectResponse(url=_frontend_redirect("/dashboard"), status_code=302)
-    redirect.set_cookie(
-        settings.cookie_name,
-        token,
-        httponly=True,
-        samesite="lax",
-        secure=settings.secure_cookies,
-        max_age=ttl_seconds,
-        expires=ttl_seconds,
-    )
+    _set_auth_cookie(redirect, token, ttl_seconds)
     redirect.delete_cookie("oauth_state")
     redirect.delete_cookie("oauth_remember")
     return redirect
